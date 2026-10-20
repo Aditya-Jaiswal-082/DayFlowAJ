@@ -1,0 +1,24 @@
+{
+  "name": "dayflowaj",
+  "private": true,
+  "version": "2.0.0",
+  "description": "DayFlow AJ — a local-first daily routine, mood, notes and expense tracker.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node tests/lib.test.mjs",
+    "verify": "node tools/verify.mjs",
+    "check": "npm run verify && npm test"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8"
+  }
+}
