@@ -8,7 +8,7 @@ import { Btn, Card, Empty, Logo, Modal, SectionTitle } from "../components/index
 
 /** Notifications, budgets, backup/restore, archived tasks, reset. */
 export function SettingsTab() {
-  const { notifications, expenses, tasks, exportData, importData, resetAll, toasts } = useTracker();
+  const { notifications, expenses, tasks, exportData, importData, resetAll, toasts, weatherCtl } = useTracker();
 
   const fileRef = useRef(null);
   const [status, setStatus] = useState(null);      // {kind:"ok"|"error", message}
@@ -65,6 +65,22 @@ export function SettingsTab() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {notifications.permission === "default" && <Btn onClick={notifications.request}>Enable notifications</Btn>}
           <Btn variant="ghost" onClick={testNotification}>Send a test</Btn>
+        </div>
+      </Card>
+
+      <Card>
+        <SectionTitle hint="The only thing that ever uses your location">Weather</SectionTitle>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 13, color: "var(--muted)", flex: "1 1 200px" }}>
+            {weatherCtl.error
+              ? weatherCtl.error
+              : weatherCtl.pref === "on"
+                ? "On — the temperature shows at the top right, next to the ＋ button. Data comes from Open-Meteo (open-meteo.com)."
+                : "Off — no location is requested."}
+          </div>
+          {weatherCtl.pref === "on"
+            ? <Btn size="sm" variant="ghost" onClick={weatherCtl.disable}>Turn off</Btn>
+            : <Btn size="sm" onClick={weatherCtl.enable}>Turn on</Btn>}
         </div>
       </Card>
 

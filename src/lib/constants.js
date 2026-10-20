@@ -128,6 +128,7 @@ export const STORAGE_KEYS = {
   people: "rt_people",
   settlements: "rt_settlements",
   weather: "rt_weather",
+  weatherPref: "rt_weather_pref",   // "on" | "off" — null until asked
   holidayTasks: "rt_holidaytasks",
   holidays: "rt_holidays",
   weekendTasks: "rt_weekendtasks",

@@ -1,13 +1,31 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
+import { useTracker } from "../context/TrackerContext.jsx";
+import { APP_FONT } from "../styles/theme.js";
 import { useIsMobile } from "../hooks/useMediaQuery.js";
+import { useVisualViewport } from "../hooks/useVisualViewport.js";
 
 /**
  * Dialog. On a phone it anchors to the bottom, spans the full width and keeps
  * its actions pinned below the scrolling body — reachable with a thumb. On a
  * larger screen it's a centred card.
+ *
+ * It is rendered into <body> through a portal. Inside a tab it was being
+ * positioned against an animated ancestor (a CSS transform makes `position:
+ * fixed` stick to that element instead of the screen), so the top or bottom of
+ * the sheet could sit off-screen and the body couldn't scroll into view. The
+ * theme variables are re-applied on the overlay, and touches are kept from
+ * bubbling to the swipe-between-tabs handler.
+ *
+ * It is sized to the *visible* screen (see useVisualViewport), not 100vh — on a
+ * phone the keyboard and address bar make those different, and sizing to 100vh
+ * pushed the footer's Save button off-screen. The body scrolls; the title and
+ * the footer never do.
  */
 export function Modal({ open, onClose, title, children, footer }) {
   const mobile = useIsMobile();
+  const view = useVisualViewport(open);
+  const { theme } = useTracker();
 
   useEffect(() => {
     if (!open) return undefined;
@@ -22,13 +40,23 @@ export function Modal({ open, onClose, title, children, footer }) {
 
   if (!open) return null;
 
-  return (
+  const stopTouch = (e) => e.stopPropagation();
+
+  return createPortal(
     <div
       className="fade"
       onClick={onClose}
+      onTouchStart={stopTouch}
+      onTouchMove={stopTouch}
+      onTouchEnd={stopTouch}
       style={{
+        ...theme,
+        color: "var(--text)",
+        fontFamily: APP_FONT,
         position: "fixed",
-        inset: 0,
+        left: 0,
+        right: 0,
+        ...(view ? { top: view.top, height: view.height } : { top: 0, bottom: 0 }),
         zIndex: 1000,
         display: "flex",
         alignItems: mobile ? "flex-end" : "center",
@@ -48,7 +76,7 @@ export function Modal({ open, onClose, title, children, footer }) {
           flexDirection: "column",
           width: "100%",
           maxWidth: mobile ? "none" : 440,
-          maxHeight: mobile ? "92vh" : "85vh",
+          maxHeight: mobile ? "94%" : "85%",
           background: "var(--card)",
           border: "1px solid var(--border)",
           borderRadius: mobile ? "22px 22px 0 0" : 20,
@@ -64,6 +92,7 @@ export function Modal({ open, onClose, title, children, footer }) {
 
         <div
           style={{
+            flexShrink: 0,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -92,7 +121,16 @@ export function Modal({ open, onClose, title, children, footer }) {
           </button>
         </div>
 
-        <div style={{ overflowY: "auto", padding: "0 1.1rem 0.4rem", WebkitOverflowScrolling: "touch" }}>
+        <div
+          style={{
+            flex: "1 1 auto",
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            padding: "0 1.1rem 0.6rem",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
           {children}
         </div>
 
@@ -103,7 +141,8 @@ export function Modal({ open, onClose, title, children, footer }) {
               gap: 8,
               justifyContent: "flex-end",
               flexWrap: "wrap",
-              padding: "0.9rem 1.1rem",
+              flexShrink: 0,
+              padding: "0.8rem 1.1rem",
               borderTop: "1px solid var(--border)",
               background: "var(--card)",
               borderRadius: mobile ? 0 : "0 0 20px 20px",
@@ -113,6 +152,7 @@ export function Modal({ open, onClose, title, children, footer }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -15,7 +15,7 @@ import { Btn } from "./Btn.jsx";
 export function TaskRow({
   text, cat, done, onToggle, onRemove, onInspect, removeTitle = "Remove",
   color = "#6366f1", badge, hint,
-  time, status, accent, highlight, onEdit,
+  time, status, accent, highlight, onEdit, disabled,
 }) {
   return (
     <div
@@ -36,9 +36,11 @@ export function TaskRow({
       <input
         type="checkbox"
         checked={!!done}
+        disabled={disabled}
+        title={disabled ? "Opens on the day" : undefined}
         onChange={() => { haptic(done ? "tap" : "toggle"); onToggle(); }}
         aria-label={text}
-        style={{ width: 21, height: 21, accentColor: color, cursor: "pointer", flexShrink: 0 }}
+        style={{ width: 21, height: 21, accentColor: color, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, flexShrink: 0 }}
       />
 
       <button

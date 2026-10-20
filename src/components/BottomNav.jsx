@@ -3,12 +3,51 @@ import { useTracker } from "../context/TrackerContext.jsx";
 import { haptic } from "../lib/haptics.js";
 
 /**
- * Thumb-reachable navigation for phones.
+ * Phone navigation: a floating glass dock.
  *
- * Five primary destinations; everything past that lives behind a ☰ Menu button
- * that opens a small sheet listing the rest, so any section is one tap away
- * (no cycling). Sits above the home indicator via env(safe-area-inset-bottom).
+ * The first five tabs get an icon each; the one you're on grows into a pill
+ * with its name beside the icon, so the bar stays calm but you always know
+ * where you are. Everything past that is behind a ☰ Menu button that opens a
+ * sheet, so any section is one tap away — no cycling. (When you're on one of
+ * those sections the button shows that section instead of "Menu".)
+ *
+ * Sits above the home indicator via env(safe-area-inset-bottom).
  */
+
+/** 24×24 stroke icons by tab id — drawn here so the dock doesn't depend on font glyphs. */
+const ICONS = {
+  today: <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 9.5" /></>,
+  expenses: <><rect x="3" y="6" width="18" height="14" rx="3" /><path d="M3 10h18" /><circle cx="16.5" cy="15" r="1.2" /></>,
+  split: <><circle cx="9" cy="12" r="5.5" /><circle cx="15" cy="12" r="5.5" /></>,
+  analysis: <path d="M5 20V12M12 20V4M19 20v-5" />,
+  reminders: <><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 21a2 2 0 0 0 4 0" /></>,
+  history: <><path d="M4 12a8 8 0 1 0 2.4-5.7" /><path d="M4 4v4h4" /><path d="M12 8v4l3 2" /></>,
+  notes: <><path d="M6 3h9l4 4v14H6z" /><path d="M9 12h7M9 16h5" /></>,
+  settings: <><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+};
+
+function Icon({ id, fallback, size = 22 }) {
+  const shape = ICONS[id];
+  if (!shape) return <span style={{ fontSize: size - 4, lineHeight: 1 }} aria-hidden="true">{fallback}</span>;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      {shape}
+    </svg>
+  );
+}
+
 export function BottomNav({ tabs, primary = 5 }) {
   const { tab, setTab } = useTracker();
   const [open, setOpen] = useState(false);
@@ -22,7 +61,7 @@ export function BottomNav({ tabs, primary = 5 }) {
 
   const shown = tabs.slice(0, primary);
   const rest = tabs.slice(primary);
-  const restActive = rest.some((t) => t.id === tab);
+  const current = rest.find((t) => t.id === tab);
 
   function go(id) {
     haptic("tap");
@@ -42,24 +81,27 @@ export function BottomNav({ tabs, primary = 5 }) {
           <div
             onClick={() => setOpen(false)}
             aria-hidden="true"
-            style={{ position: "fixed", inset: 0, zIndex: 898, background: "rgba(8,12,23,0.35)" }}
+            className="fade"
+            style={{ position: "fixed", inset: 0, zIndex: 898, background: "rgba(8,12,23,0.38)", backdropFilter: "blur(2px)" }}
           />
           <div
             role="menu"
             aria-label="More sections"
+            className="slide-up"
             style={{
               position: "fixed",
               left: 12,
               right: 12,
-              bottom: "calc(78px + env(safe-area-inset-bottom))",
+              bottom: "calc(86px + env(safe-area-inset-bottom))",
               zIndex: 899,
               display: "grid",
-              gap: 4,
-              padding: 8,
-              borderRadius: 18,
+              gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
+              gap: 8,
+              padding: 10,
+              borderRadius: 22,
               background: "var(--card)",
               border: "1px solid var(--border)",
-              boxShadow: "0 12px 36px rgba(8,12,23,0.28)",
+              boxShadow: "0 16px 44px rgba(8,12,23,0.30)",
             }}
           >
             {rest.map((t) => {
@@ -73,22 +115,20 @@ export function BottomNav({ tabs, primary = 5 }) {
                   onClick={() => go(t.id)}
                   aria-current={on ? "page" : undefined}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "0.8rem 0.9rem",
-                    borderRadius: 13,
-                    border: "1px solid transparent",
-                    borderColor: on ? "var(--border)" : "transparent",
-                    background: on ? "var(--accent-soft)" : "transparent",
+                    display: "grid",
+                    justifyItems: "center",
+                    gap: 6,
+                    padding: "0.85rem 0.4rem 0.7rem",
+                    borderRadius: 16,
+                    border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
+                    background: on ? "var(--accent-soft)" : "var(--bg-2)",
                     color: on ? "var(--accent)" : "var(--text)",
-                    fontSize: 15,
+                    fontSize: 12.5,
                     fontWeight: 700,
-                    textAlign: "left",
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ fontSize: 18, width: 24, textAlign: "center" }} aria-hidden="true">{t.icon}</span>
+                  <Icon id={t.id} fallback={t.icon} size={24} />
                   {t.label}
                 </button>
               );
@@ -101,69 +141,84 @@ export function BottomNav({ tabs, primary = 5 }) {
         aria-label="Main"
         style={{
           position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
+          left: 12,
+          right: 12,
+          bottom: "calc(10px + env(safe-area-inset-bottom))",
           zIndex: 900,
           display: "flex",
-          justifyContent: "space-around",
-          gap: 2,
-          padding: "6px 6px calc(6px + env(safe-area-inset-bottom))",
+          alignItems: "center",
+          gap: 4,
+          padding: 6,
+          borderRadius: 26,
           background: "var(--glass)",
-          backdropFilter: "blur(14px)",
-          borderTop: "1px solid var(--border)",
-          boxShadow: "0 -8px 24px rgba(8,12,23,0.10)",
+          backdropFilter: "blur(18px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.4)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 10px 30px rgba(8,12,23,0.20), 0 2px 6px rgba(8,12,23,0.08)",
         }}
       >
         {shown.map((t) => (
-          <NavItem key={t.id} icon={t.icon} label={t.label} on={tab === t.id && !open} onClick={() => go(t.id)} />
+          <NavItem key={t.id} id={t.id} icon={t.icon} label={t.label} on={tab === t.id && !open} onClick={() => go(t.id)} />
         ))}
         {rest.length > 0 && (
-          <NavItem icon="☰" label="Menu" on={restActive || open} onClick={toggleMenu} expanded={open} />
+          <NavItem
+            id={current && !open ? current.id : "menu"}
+            icon="☰"
+            label={current && !open ? current.label : "Menu"}
+            on={!!current || open}
+            expanded={open}
+            onClick={toggleMenu}
+          />
         )}
       </nav>
     </>
   );
 }
 
-function NavItem({ icon, label, on, onClick, expanded }) {
+function NavItem({ id, icon, label, on, onClick, expanded }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
       aria-current={on && expanded === undefined ? "page" : undefined}
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : "menu"}
       className="pressable"
       style={{
-        flex: 1,
-        maxWidth: 84,
+        flex: on ? "2.1 1 0" : "1 1 0",
+        minWidth: 0,
+        height: 46,
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
-        gap: 2,
-        padding: "7px 2px 5px",
-        borderRadius: 14,
+        justifyContent: "center",
+        gap: 6,
+        padding: "0 6px",
+        borderRadius: 20,
         border: "1px solid transparent",
         background: on ? "var(--accent-soft)" : "transparent",
         borderColor: on ? "var(--border)" : "transparent",
         color: on ? "var(--accent)" : "var(--muted)",
         cursor: "pointer",
-        transition: "background 180ms ease, color 180ms ease",
+        overflow: "hidden",
+        transition: "flex 280ms cubic-bezier(.22,.61,.36,1), background 200ms ease, color 200ms ease",
       }}
     >
-      <span style={{ fontSize: 17, lineHeight: 1 }} aria-hidden="true">{icon}</span>
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: -0.1 }}>{label}</span>
+      <Icon id={id} fallback={icon} />
       <span
-        aria-hidden="true"
         style={{
-          width: on ? 16 : 0,
-          height: 2.5,
-          borderRadius: 999,
-          background: "var(--accent)",
-          transition: "width 220ms cubic-bezier(.34,1.56,.64,1)",
+          maxWidth: on ? 70 : 0,
+          opacity: on ? 1 : 0,
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: -0.1,
+          transition: "max-width 280ms cubic-bezier(.22,.61,.36,1), opacity 200ms ease",
         }}
-      />
+      >
+        {label}
+      </span>
     </button>
   );
 }

@@ -32,6 +32,9 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
 
   const day = useMemo(() => dayOf(dayData, selectedDay), [dayData, selectedDay]);
 
+  /** A day that hasn't happened yet can be planned but not ticked or mood-logged. */
+  const isFuture = selectedDay > today;
+
   /** The regular tasks that belong to the day being viewed, high priority first. */
   const dayTasks = useMemo(
     () => sortByPriority(tasksActiveOn(regularTasks, selectedDay)),
@@ -67,6 +70,8 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
    * plain task is exactly what it always was.
    */
   const makeTask = useCallback(({ text, cat, priority = "normal", start, end, days }, id) => {
+    // Added while looking at a future day? It starts on that day, not today.
+    const from = selectedDay > today ? selectedDay : today;
     const clean = String(text || "").trim();
     if (!clean) return null;
     const timed = Number.isFinite(start);
@@ -77,10 +82,10 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
       priority,
       ...(timed ? { start, end: Number.isFinite(end) ? end : null } : {}),
       ...(days && days !== "all" ? { days } : {}),
-      createdAt: today,
+      createdAt: from,
       archivedAt: null,
     };
-  }, [today]);
+  }, [selectedDay, today]);
 
   const add = useCallback((fields) => {
     const task = makeTask(fields, Date.now());
@@ -137,8 +142,9 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
   /* ── the selected day ── */
 
   const toggleCheck = useCallback((id) => {
+    if (isFuture) return;
     patchDay(selectedDay, { checks: { ...day.checks, [id]: !day.checks[id] } });
-  }, [day.checks, patchDay, selectedDay]);
+  }, [day.checks, isFuture, patchDay, selectedDay]);
 
   /** listName is "extra" or "special". */
   const addListItem = useCallback((listName, text) => {
@@ -150,10 +156,11 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
   }, [day, patchDay, selectedDay]);
 
   const toggleListItem = useCallback((listName, idx) => {
+    if (isFuture) return;
     patchDay(selectedDay, {
       [listName]: day[listName].map((item, i) => (i === idx ? { ...item, done: !item.done } : item)),
     });
-  }, [day, patchDay, selectedDay]);
+  }, [day, isFuture, patchDay, selectedDay]);
 
   const removeListItem = useCallback((listName, idx) => {
     const item = day[listName][idx];
@@ -171,8 +178,9 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
   }, [day, patchDay, selectedDay, setDayData, undoable]);
 
   const setMood = useCallback((val) => {
+    if (isFuture) return;
     patchDay(selectedDay, { mood: day.mood === val ? "" : val });
-  }, [day.mood, patchDay, selectedDay]);
+  }, [day.mood, isFuture, patchDay, selectedDay]);
 
   const setNote = useCallback((note) => patchDay(selectedDay, { note }), [patchDay, selectedDay]);
 
@@ -212,8 +220,9 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
   }, [setHolidayTasks]);
 
   const toggleHolidayCheck = useCallback((id) => {
+    if (isFuture) return;
     patchDay(selectedDay, { holidayChecks: { ...day.holidayChecks, [id]: !day.holidayChecks[id] } });
-  }, [day.holidayChecks, patchDay, selectedDay]);
+  }, [day.holidayChecks, isFuture, patchDay, selectedDay]);
 
   /** Mark a day (usually the one being viewed) as a holiday, with an optional label. */
   const setHoliday = useCallback((key, label) => {
@@ -268,8 +277,9 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
   }, [setWeekendTasks]);
 
   const toggleWeekendCheck = useCallback((id) => {
+    if (isFuture) return;
     patchDay(selectedDay, { weekendChecks: { ...day.weekendChecks, [id]: !day.weekendChecks[id] } });
-  }, [day.weekendChecks, patchDay, selectedDay]);
+  }, [day.weekendChecks, isFuture, patchDay, selectedDay]);
 
   return useMemo(() => ({
     all: regularTasks,
@@ -277,6 +287,7 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
     archived,
     dayData,
     day,
+    isFuture,
     getDay,
     add,
     addMany,
@@ -319,7 +330,7 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
     toggleWeekendCheck,
     replaceWeekendTasks: setWeekendTasks,
   }), [
-    regularTasks, dayTasks, archived, dayData, day, getDay, add, addMany, update, archive, unarchive, purge,
+    regularTasks, dayTasks, archived, dayData, day, isFuture, getDay, add, addMany, update, archive, unarchive, purge,
     toggleCheck, addListItem, toggleListItem, removeListItem, setMood, setNote,
     setRegularTasks, setDayData,
     holidayTasks, dayHolidayTasks, archivedHoliday, holidays, isHoliday, holidayLabel,

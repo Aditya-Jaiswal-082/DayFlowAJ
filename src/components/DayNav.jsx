@@ -81,7 +81,6 @@ export function DayNav() {
             size="icon"
             variant="ghost"
             title="Next day"
-            disabled={isToday}
             onClick={() => setSelectedDay(addDays(selectedDay, 1))}
           >
             ›
@@ -131,7 +130,7 @@ export function DayNav() {
       </Card>
 
       <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Jump to a date">
-        <Calendar value={selectedDay} onSelect={jumpTo} max={today} />
+        <Calendar value={selectedDay} onSelect={jumpTo} max={addDays(today, 730)} />
       </Modal>
     </>
   );

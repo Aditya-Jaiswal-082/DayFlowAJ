@@ -9,8 +9,10 @@ import {
 import { useNow } from "../hooks/useNow.js";
 import { gridCols } from "../styles/theme.js";
 import { haptic } from "../lib/haptics.js";
+import { formatDate } from "../lib/dates.js";
 import {
   Btn, Card, CircleProgress, DayNav, Empty, Field, Modal, NowNext, SectionTitle, TaskEditor, TaskRow, TiltCard,
+  WhenPicker, whenToTimestamp, whenValue,
 } from "../components/index.js";
 
 const STATUS = {
@@ -29,8 +31,8 @@ const priorityOf = (val) => PRIORITIES.find((p) => p.val === val) || PRIORITIES[
  */
 export function TodayTab() {
   const {
-    tasks, stats, quote, catColor, reminders,
-    openInsight, selectedDay, isWeekend, today, isToday,
+    tasks, stats, quote, catColor, reminders, notifications,
+    openInsight, selectedDay, isWeekend, today, isToday, isFuture,
   } = useTracker();
   const nowMin = useNow();
 
@@ -47,6 +49,14 @@ export function TodayTab() {
 
   const [listModal, setListModal] = useState(null);   // "special" | "extra" | null
   const [listText, setListText] = useState("");
+  const [listWhen, setListWhen] = useState(() => whenValue(false));
+
+  /** Open the special/extra modal; a reminder, if wanted, defaults to the day being viewed. */
+  function openList(name) {
+    setListText("");
+    setListWhen({ ...whenValue(false), date: selectedDay >= today ? selectedDay : today });
+    setListModal(name);
+  }
 
   const [holidayModal, setHolidayModal] = useState(false);
   const [holidayText, setHolidayText] = useState("");
@@ -82,8 +92,14 @@ export function TodayTab() {
     }
   }
 
-  function saveListItem() {
-    if (tasks.addListItem(listModal, listText)) {
+  async function saveListItem() {
+    const text = listText.trim();
+    if (!text) return;
+    if (listWhen.on && notifications.supported && notifications.permission === "default") {
+      await notifications.request();
+    }
+    if (tasks.addListItem(listModal, text)) {
+      if (listWhen.on) reminders.add({ text, at: whenToTimestamp(listWhen) });
       haptic("success");
       setListText("");
       setListModal(null);
@@ -99,16 +115,32 @@ export function TodayTab() {
       <DayNav />
 
       <TiltCard style={{ display: "flex", alignItems: "center", gap: "1.1rem" }}>
-        <CircleProgress pct={stats.pct} label="done" />
+        {isFuture ? (
+          <div
+            aria-hidden="true"
+            style={{
+              width: 96, height: 96, flexShrink: 0, borderRadius: "50%", display: "grid", placeItems: "center",
+              fontSize: 36, background: "var(--bg-2)", border: "1px solid var(--border)",
+            }}
+          >
+            📅
+          </div>
+        ) : (
+          <CircleProgress pct={stats.pct} label="done" />
+        )}
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: -0.6 }}>{done}/{total}</div>
           <div style={{ fontSize: 12.5, color: "var(--muted)" }}>
-            {total === 0 ? "nothing scheduled" : remaining === 0 ? "all done for today" : `${remaining} left today`}
+            {isFuture
+              ? (total === 0 ? "nothing planned yet" : `planned for this day — ticking opens on the day`)
+              : total === 0 ? "nothing scheduled" : remaining === 0 ? "all done for today" : `${remaining} left today`}
           </div>
           <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
-            <Btn size="sm" variant="ghost" onClick={() => openInsight({ kind: "day", key: selectedDay })}>
-              Day insight
-            </Btn>
+            {!isFuture && (
+              <Btn size="sm" variant="ghost" onClick={() => openInsight({ kind: "day", key: selectedDay })}>
+                Day insight
+              </Btn>
+            )}
             <span
               style={{
                 display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700,
@@ -123,7 +155,7 @@ export function TodayTab() {
       </TiltCard>
 
       <Card>
-        <SectionTitle hint="Tap again to clear it">How are you feeling?</SectionTitle>
+        <SectionTitle hint={isFuture ? "Opens on the day" : "Tap again to clear it"}>How are you feeling?</SectionTitle>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {MOOD_OPTS.map((m) => {
             const active = tasks.day.mood === m.val;
@@ -132,14 +164,16 @@ export function TodayTab() {
                 key={m.val}
                 type="button"
                 className="pressable"
+                disabled={isFuture}
                 onClick={() => { haptic("toggle"); tasks.setMood(m.val); }}
                 style={{
+                  opacity: isFuture ? 0.45 : 1,
                   flex: "1 1 88px",
                   padding: "0.55rem 0.4rem",
                   borderRadius: 14,
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: isFuture ? "not-allowed" : "pointer",
                   border: `1px solid ${active ? m.color : "var(--border)"}`,
                   background: active ? `${m.color}1f` : "var(--bg-2)",
                   color: active ? m.color : "var(--muted)",
@@ -196,6 +230,7 @@ export function TodayTab() {
                 color={catColor(task.cat)}
                 done={!!tasks.day.checks[task.id]}
                 onToggle={() => tasks.toggleCheck(task.id)}
+                disabled={isFuture}
                 onInspect={() => openInsight({ kind: "task", taskId: task.id })}
                 onEdit={() => setEditor({ task })}
                 onRemove={() => tasks.archive(task.id)}
@@ -243,6 +278,7 @@ export function TodayTab() {
                 color={catColor(t.cat)}
                 done={!!tasks.day.checks[t.id]}
                 onToggle={() => tasks.toggleCheck(t.id)}
+                disabled={isFuture}
                 onInspect={() => openInsight({ kind: "task", taskId: t.id })}
                 onEdit={() => setEditor({ task: t })}
                 onRemove={() => tasks.archive(t.id)}
@@ -277,6 +313,7 @@ export function TodayTab() {
                   color={catColor(t.cat)}
                   done={!!tasks.day.holidayChecks[t.id]}
                   onToggle={() => tasks.toggleHolidayCheck(t.id)}
+                  disabled={isFuture}
                   onRemove={() => tasks.archiveHolidayTask(t.id)}
                   removeTitle="Archive"
                   badge={t.priority !== "normal" ? { label: p.label, color: p.color } : null}
@@ -308,6 +345,7 @@ export function TodayTab() {
                   color={catColor(t.cat)}
                   done={!!tasks.day.weekendChecks[t.id]}
                   onToggle={() => tasks.toggleWeekendCheck(t.id)}
+                  disabled={isFuture}
                   onRemove={() => tasks.archiveWeekendTask(t.id)}
                   removeTitle="Archive"
                   badge={t.priority !== "normal" ? { label: p.label, color: p.color } : null}
@@ -324,7 +362,8 @@ export function TodayTab() {
           items={tasks.day.special}
           color="#8b5cf6"
           emptyText="Nothing special planned."
-          onAdd={() => setListModal("special")}
+          disabled={isFuture}
+          onAdd={() => openList("special")}
           onToggle={(i) => tasks.toggleListItem("special", i)}
           onRemove={(i) => tasks.removeListItem("special", i)}
         />
@@ -333,7 +372,8 @@ export function TodayTab() {
           items={tasks.day.extra}
           color="#06b6d4"
           emptyText="No extras logged."
-          onAdd={() => setListModal("extra")}
+          disabled={isFuture}
+          onAdd={() => openList("extra")}
           onToggle={(i) => tasks.toggleListItem("extra", i)}
           onRemove={(i) => tasks.removeListItem("extra", i)}
         />
@@ -351,7 +391,11 @@ export function TodayTab() {
       <Modal
         open={!!listModal}
         onClose={() => setListModal(null)}
-        title={listModal === "special" ? "Add special task" : "Add extra task"}
+        title={
+          isFuture
+            ? `Plan for ${formatDate(selectedDay)}`
+            : listModal === "special" ? "Add special task" : "Add extra task"
+        }
         footer={
           <>
             <Btn variant="ghost" onClick={() => setListModal(null)}>Cancel</Btn>
@@ -359,14 +403,25 @@ export function TodayTab() {
           </>
         }
       >
-        <Field
-          label="Task"
-          value={listText}
-          onChange={setListText}
-          autoFocus
-          onEnter={saveListItem}
-          placeholder={listModal === "special" ? "One-off task for this day" : "Something extra you did"}
-        />
+        <div style={{ display: "grid", gap: "0.9rem" }}>
+          <Field
+            label="Task"
+            value={listText}
+            onChange={setListText}
+            autoFocus
+            onEnter={saveListItem}
+            placeholder={
+              isFuture ? "e.g. Buy Riya\u2019s birthday gift"
+                : listModal === "special" ? "One-off task for this day" : "Something extra you did"
+            }
+          />
+          <WhenPicker value={listWhen} onChange={setListWhen} label="Remind me" />
+          {isFuture && (
+            <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
+              It will wait on {formatDate(selectedDay)} — you can tick it when the day comes.
+            </div>
+          )}
+        </div>
       </Modal>
       <Modal
         open={holidayModal}
@@ -405,7 +460,7 @@ export function TodayTab() {
 }
 
 /** Shared shell for the per-day special / extra lists. */
-function DayList({ title, items, color, emptyText, onAdd, onToggle, onRemove }) {
+function DayList({ title, items, color, emptyText, onAdd, onToggle, onRemove, disabled }) {
   return (
     <Card>
       <SectionTitle right={<Btn size="sm" variant="ghost" onClick={onAdd}>+ Add</Btn>}>{title}</SectionTitle>
@@ -419,6 +474,7 @@ function DayList({ title, items, color, emptyText, onAdd, onToggle, onRemove }) 
             cat={item.cat}
             color={color}
             done={item.done}
+            disabled={disabled}
             onToggle={() => onToggle(i)}
             onRemove={() => onRemove(i)}
           />

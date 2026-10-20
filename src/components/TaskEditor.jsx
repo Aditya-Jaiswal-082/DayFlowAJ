@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTracker } from "../context/TrackerContext.jsx";
 import { PRIORITIES, TASK_CATS } from "../lib/constants.js";
+import { formatDate } from "../lib/dates.js";
 import {
   REPEAT_OPTIONS, formatRange, isTimed, parseScheduleText, repeatLabel, repeatValue, toHHMM, toMinutes,
 } from "../lib/schedule.js";
@@ -24,7 +25,7 @@ const REPEAT_LABELS = REPEAT_OPTIONS.map((o) => o.label);
  * starts fresh every time.
  */
 export function TaskEditor({ task, nowMin, onClose }) {
-  const { tasks, addTaskWithReminder, notifications, isToday } = useTracker();
+  const { tasks, addTaskWithReminder, notifications, isFuture, selectedDay } = useTracker();
   const editing = !!task;
 
   const [mode, setMode] = useState("one");   // "one" | "many"
@@ -35,7 +36,7 @@ export function TaskEditor({ task, nowMin, onClose }) {
   const [start, setStart] = useState(task && isTimed(task) ? toHHMM(task.start) : toHHMM(nowMin));
   const [end, setEnd] = useState(task && task.end != null ? toHHMM(task.end) : "");
   const [repeat, setRepeat] = useState(repeatLabel(task?.days));
-  const [when, setWhen] = useState(() => whenValue(false));
+  const [when, setWhen] = useState(() => ({ ...whenValue(false), ...(isFuture ? { date: selectedDay } : {}) }));
   const [bulk, setBulk] = useState("");
 
   const parsed = useMemo(() => parseScheduleText(bulk, { allowUntimed: true }), [bulk]);
@@ -135,7 +136,7 @@ export function TaskEditor({ task, nowMin, onClose }) {
           </>
         ) : (
           <>
-            <Field label="Task" value={text} onChange={setText} autoFocus onEnter={submit} placeholder="Gym" />
+            <Field label="Task" value={text} onChange={setText} autoFocus={!editing} onEnter={submit} placeholder="Gym" />
             <Field label="Category" options={TASK_CATS} value={cat} onChange={setCat} />
 
             <div>
@@ -199,8 +200,8 @@ export function TaskEditor({ task, nowMin, onClose }) {
         <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
           {editing
             ? "Changes apply to every day this task is on, past days included."
-            : isToday
-              ? "New tasks appear from today onward."
+            : isFuture
+              ? `This task starts on ${formatDate(selectedDay)}.`
               : "New tasks appear from today onward — past days stay as they were."}
         </div>
       </div>

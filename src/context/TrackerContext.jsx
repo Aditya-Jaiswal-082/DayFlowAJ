@@ -71,7 +71,8 @@ export function TrackerProvider({ children }) {
   const expenses = useExpenses({ today, undoable });
   const people = usePeople({ today, undoable });
 
-  const weather = useWeather();
+  const weatherCtl = useWeather();
+  const weather = weatherCtl.data;
   const quote = useQuote(selectedDay, tasks.isHoliday);
   const isWeekend = isWeekendKey(selectedDay);
 
@@ -159,7 +160,8 @@ export function TrackerProvider({ children }) {
    *  today. This is what makes the Analysis tab show something meaningful
    *  right after restoring a backup from a while ago, instead of a blank
    *  week nobody has any data for yet. */
-  const insightKeys = useMemo(() => getPastDaysEndingAt(selectedDay, 7), [selectedDay]);
+  const anchorDay = selectedDay > today ? today : selectedDay;   // browsing the future must not skew the stats
+  const insightKeys = useMemo(() => getPastDaysEndingAt(anchorDay, 7), [anchorDay]);
 
   const pctFor = useCallback(
     (key) => completionPct(tasks.dayData, key, tasks.all),
@@ -176,9 +178,9 @@ export function TrackerProvider({ children }) {
       trend: buildTrend(tasks.dayData, insightKeys, tasks.all),
       mood: buildMood(tasks.dayData, insightKeys),
       radar: buildRadar(tasks.day, tasks.dayTasks),
-      weekdays: weekdayPattern(tasks.dayData, tasks.all, 6, selectedDay),
-      completionTrend: completionTrend(tasks.dayData, tasks.all, selectedDay),
-      spendTrend: spendTrend(expenses.all, selectedDay),
+      weekdays: weekdayPattern(tasks.dayData, tasks.all, 6, anchorDay),
+      completionTrend: completionTrend(tasks.dayData, tasks.all, anchorDay),
+      spendTrend: spendTrend(expenses.all, anchorDay),
       expense: expenseTotals(expenses.all, today),
       expenseByCat: expensesByCategory(expenses.all),
       expenseByDay: expensesByDay(expenses.all, insightKeys),
@@ -188,7 +190,7 @@ export function TrackerProvider({ children }) {
       months: recentMonths(6, today),
       tasksOn: (key) => tasksActiveOn(tasks.all, key),
     };
-  }, [expenses.all, expenses.budgets, insightKeys, recentKeys, selectedDay, tasks.all, tasks.day, tasks.dayData, tasks.dayTasks, today]);
+  }, [expenses.all, expenses.budgets, insightKeys, recentKeys, selectedDay, anchorDay, tasks.all, tasks.day, tasks.dayData, tasks.dayTasks, today]);
 
   /* ── insights ── */
 
@@ -197,7 +199,7 @@ export function TrackerProvider({ children }) {
     let next = null;
 
     if (request.kind === "day") next = dayInsight({ ...base, key: request.key });
-    if (request.kind === "task") next = taskInsight({ ...base, taskId: request.taskId, anchorKey: selectedDay });
+    if (request.kind === "task") next = taskInsight({ ...base, taskId: request.taskId, anchorKey: anchorDay });
     if (request.kind === "month") {
       next = monthInsight({ ...base, monthKey: request.monthKey || month, todayKey: today });
     }
@@ -243,15 +245,15 @@ export function TrackerProvider({ children }) {
   }, []);
 
   const value = useMemo(() => ({
-    today, selectedDay, setSelectedDay, isToday: selectedDay === today, isWeekend,
+    today, selectedDay, setSelectedDay, isToday: selectedDay === today, isFuture: selectedDay > today, isWeekend,
     tab, setTab, dark, toggleDark: () => setDark((d) => !d), isMobile,
     month, setMonth, insight, openInsight, closeInsight,
-    theme, chart, catColor, stats, pctFor, quote, weather, split,
+    theme, chart, catColor, stats, pctFor, quote, weather, weatherCtl, split,
     tasks, notes, expenses, people, reminders, notifications, toasts,
     addTaskWithReminder, cancelReminder, exportData, importData, resetAll,
   }), [
     today, selectedDay, tab, dark, setDark, isMobile, month, insight, openInsight, closeInsight,
-    theme, chart, catColor, stats, pctFor, quote, weather, split, isWeekend,
+    theme, chart, catColor, stats, pctFor, quote, weather, weatherCtl, split, isWeekend,
     tasks, notes, expenses, people, reminders, notifications, toasts,
     addTaskWithReminder, cancelReminder, exportData, importData, resetAll,
   ]);

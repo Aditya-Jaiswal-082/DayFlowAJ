@@ -16,7 +16,7 @@ import { WhenPicker, whenToTimestamp, whenValue } from "./WhenPicker.jsx";
  */
 export function AppBar() {
   const {
-    selectedDay, today, isToday, setSelectedDay, dark, toggleDark, weather, reminders,
+    selectedDay, today, isToday, isFuture, setSelectedDay, dark, toggleDark, weather, weatherCtl, reminders,
     notifications, stats, setTab,
   } = useTracker();
 
@@ -50,6 +50,16 @@ export function AppBar() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <Wordmark />
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {weatherCtl.pref === "on" && (
+              <Chip tone="var(--text)" onClick={() => setTab("settings")}>
+                {weather
+                  ? <>{WEATHER_ICONS[weather.desc] || WEATHER_ICONS.default} {weather.temp}°C</>
+                  : weatherCtl.status === "error" ? "☁ weather unavailable" : "☁ weather…"}
+              </Chip>
+            )}
+            {weatherCtl.nudge && !weatherCtl.error && (
+              <Chip onClick={weatherCtl.enable}>☁ Enable weather</Chip>
+            )}
             <Btn size="icon" variant="ghost" onClick={() => setOpen(true)} title="New reminder">＋</Btn>
             <Btn size="icon" variant="ghost" onClick={toggleDark} title={dark ? "Light mode" : "Dark mode"}>
               {dark ? "☀" : "☾"}
@@ -63,20 +73,47 @@ export function AppBar() {
         >
           <Chip>{isToday ? "Today" : formatDate(selectedDay).split(",")[0]} · {formatDate(selectedDay).slice(5)}</Chip>
           {stats.streak > 0 && <Chip tone="#f59e0b">🔥 {stats.streak}-day streak</Chip>}
-          {weather && <Chip>{WEATHER_ICONS[weather.desc] || WEATHER_ICONS.default} {weather.temp}°C</Chip>}
           {reminders.next && (
             <Chip tone="#f59e0b" onClick={() => setTab("reminders")}>
               🔔 {reminders.next.text} · {formatWhen(reminders.next.at)}
             </Chip>
           )}
-          {/* Editing a past day is easy to forget you're doing — this is both
-              the warning and the way back. */}
+          {/* Being on another day is easy to forget — this is both the reminder
+              and the way back. A future day is planned, not edited. */}
           {!isToday && (
-            <Chip tone="#f59e0b" onClick={() => setSelectedDay(today)}>
-              editing a past day · back to today
+            <Chip tone={isFuture ? "#6366f1" : "#f59e0b"} onClick={() => setSelectedDay(today)}>
+              {isFuture ? "planning a future day" : "editing a past day"} · back to today
             </Chip>
           )}
         </div>
+
+        {(weatherCtl.askable || weatherCtl.error) && (
+          <div
+            className="fade"
+            style={{
+              marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+              padding: "0.5rem 0.65rem", borderRadius: 14, background: "var(--card)",
+              border: `1px solid ${weatherCtl.error ? "#ef444466" : "var(--border)"}`, boxShadow: "var(--shadow-1)",
+            }}
+          >
+            {weatherCtl.error ? (
+              <>
+                <span style={{ flex: "1 1 200px", fontSize: 12, lineHeight: 1.35, color: "#ef4444" }}>{weatherCtl.error}</span>
+                <Btn size="sm" variant="ghost" onClick={weatherCtl.dismissError}>Dismiss</Btn>
+                <Btn size="sm" onClick={weatherCtl.enable}>Try again</Btn>
+              </>
+            ) : (
+              <>
+                <span style={{ flex: "1 1 180px", fontSize: 12, lineHeight: 1.35, color: "var(--muted)" }}>
+                  <strong style={{ color: "var(--text)" }}>☀ Show the weather up here?</strong>{" "}
+                  Needs your location, only for this. Nothing else uses it.
+                </span>
+                <Btn size="sm" variant="ghost" onClick={weatherCtl.disable}>No thanks</Btn>
+                <Btn size="sm" onClick={weatherCtl.enable}>Allow</Btn>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
       <Modal
