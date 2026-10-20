@@ -1,5 +1,5 @@
 import { emptyDay, EXPENSE_CATS, MOOD_SCORE, PRIORITY_ORDER } from "./constants.js";
-import { daysAgoKey, shortLabel } from "./dates.js";
+import { daysAgoKey, isWeekendKey, shortLabel } from "./dates.js";
 import { sumBy } from "./format.js";
 
 /** Pure calculations — no React, no storage. `npm test` covers this file. */
@@ -19,7 +19,6 @@ export function dayOf(dayData, key) {
     special: [...(stored.special || [])],
     holidayChecks: { ...(stored.holidayChecks || {}) },
     weekendChecks: { ...(stored.weekendChecks || {}) },
-    scheduleChecks: { ...(stored.scheduleChecks || {}) },
   };
 }
 
@@ -32,7 +31,7 @@ export function dayOf(dayData, key) {
 export function hasDaySignal(day) {
   if (!day) return false;
   const anyTrue = (obj) => Object.values(obj || {}).some(Boolean);
-  return anyTrue(day.checks) || anyTrue(day.holidayChecks) || anyTrue(day.weekendChecks) || anyTrue(day.scheduleChecks)
+  return anyTrue(day.checks) || anyTrue(day.holidayChecks) || anyTrue(day.weekendChecks)
     || !!day.note || !!day.mood;
 }
 
@@ -44,9 +43,15 @@ export function hasDaySignal(day) {
  * it from the days it was actually part of. A null createdAt means "always".
  */
 export function tasksActiveOn(regularTasks, dayKey) {
-  return regularTasks.filter(
-    (t) => (!t.createdAt || t.createdAt <= dayKey) && (!t.archivedAt || t.archivedAt > dayKey),
-  );
+  const weekend = isWeekendKey(dayKey);
+  return regularTasks.filter((t) => {
+    if (t.createdAt && t.createdAt > dayKey) return false;
+    if (t.archivedAt && t.archivedAt <= dayKey) return false;
+    // Optional repeat rule (set on timed tasks): absent or "all" means every day.
+    if (t.days === "weekdays") return !weekend;
+    if (t.days === "weekends") return weekend;
+    return true;
+  });
 }
 
 export function sortByPriority(tasks) {

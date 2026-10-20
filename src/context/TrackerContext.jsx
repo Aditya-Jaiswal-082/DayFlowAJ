@@ -3,7 +3,6 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import { useStorage } from "../hooks/useStorage.js";
 import { useTasks } from "../hooks/useTasks.js";
 import { useNotes } from "../hooks/useNotes.js";
-import { useSchedule } from "../hooks/useSchedule.js";
 import { useExpenses } from "../hooks/useExpenses.js";
 import { usePeople } from "../hooks/usePeople.js";
 import { useReminders } from "../hooks/useReminders.js";
@@ -69,7 +68,6 @@ export function TrackerProvider({ children }) {
 
   const tasks = useTasks({ today, selectedDay, undoable, onTaskArchived: reminders.cancelForTask });
   const notes = useNotes({ today, undoable });
-  const schedule = useSchedule({ today, fromDay: selectedDay, undoable });
   const expenses = useExpenses({ today, undoable });
   const people = usePeople({ today, undoable });
 
@@ -79,8 +77,8 @@ export function TrackerProvider({ children }) {
 
   /* ── actions ── */
 
-  const addTaskWithReminder = useCallback(({ text, cat, priority, remindAt }) => {
-    const task = tasks.add({ text, cat, priority });
+  const addTaskWithReminder = useCallback(({ text, cat, priority, remindAt, start, end, days }) => {
+    const task = tasks.add({ text, cat, priority, start, end, days });
     if (!task) return false;
     if (remindAt) reminders.add({ text: task.text, at: remindAt, taskId: task.id });
     haptic("success");
@@ -107,10 +105,9 @@ export function TrackerProvider({ children }) {
     holidayTasks: tasks.holidayTasks,
     holidays: tasks.holidays,
     weekendTasks: tasks.weekendTasks,
-    schedule: schedule.all,
   }), [
     dark, tasks.all, tasks.dayData, notes.all, expenses.all, expenses.budgets, reminders.all,
-    people.all, people.settlements, tasks.holidayTasks, tasks.holidays, tasks.weekendTasks, schedule.all,
+    people.all, people.settlements, tasks.holidayTasks, tasks.holidays, tasks.weekendTasks,
   ]);
 
   const importData = useCallback((data) => {
@@ -125,7 +122,6 @@ export function TrackerProvider({ children }) {
     if (Array.isArray(data.holidayTasks)) tasks.replaceHolidayTasks(data.holidayTasks);
     if (data.holidays && typeof data.holidays === "object") tasks.replaceHolidays(data.holidays);
     if (Array.isArray(data.weekendTasks)) tasks.replaceWeekendTasks(data.weekendTasks);
-    if (Array.isArray(data.schedule)) schedule.replaceAll(data.schedule);
     if (typeof data.dark === "boolean") setDark(data.dark);
 
     // Land somewhere the restored data actually is, not blindly on "today" —
@@ -138,7 +134,7 @@ export function TrackerProvider({ children }) {
     setMonth(monthKeyOf(landOn));
 
     return summarise(data);
-  }, [expenses, notes, people, reminders, schedule, setDark, setMonth, tasks, today]);
+  }, [expenses, notes, people, reminders, setDark, setMonth, tasks, today]);
 
   const resetAll = useCallback(() => {
     tasks.replaceAll([]);
@@ -152,9 +148,8 @@ export function TrackerProvider({ children }) {
     tasks.replaceHolidayTasks([]);
     tasks.replaceHolidays({});
     tasks.replaceWeekendTasks([]);
-    schedule.replaceAll([]);
     setSelectedDay(today);
-  }, [expenses, notes, people, reminders, schedule, tasks, today]);
+  }, [expenses, notes, people, reminders, tasks, today]);
 
   /* ── derived ── */
 
@@ -252,12 +247,12 @@ export function TrackerProvider({ children }) {
     tab, setTab, dark, toggleDark: () => setDark((d) => !d), isMobile,
     month, setMonth, insight, openInsight, closeInsight,
     theme, chart, catColor, stats, pctFor, quote, weather, split,
-    tasks, notes, schedule, expenses, people, reminders, notifications, toasts,
+    tasks, notes, expenses, people, reminders, notifications, toasts,
     addTaskWithReminder, cancelReminder, exportData, importData, resetAll,
   }), [
     today, selectedDay, tab, dark, setDark, isMobile, month, insight, openInsight, closeInsight,
     theme, chart, catColor, stats, pctFor, quote, weather, split, isWeekend,
-    tasks, notes, schedule, expenses, people, reminders, notifications, toasts,
+    tasks, notes, expenses, people, reminders, notifications, toasts,
     addTaskWithReminder, cancelReminder, exportData, importData, resetAll,
   ]);
 

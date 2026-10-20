@@ -130,6 +130,24 @@ touching their completion % or streak. Marking today "Diwali" doesn't rewrite wh
 100% has meant on every ordinary day before it. Saturdays and Sundays get the same
 treatment with their own weekend task list.
 
+### One list, with an optional time
+
+There's no separate planner: a task can simply *have a time*. Add one with **At a time**
+and a start (and optional end), and it sits on a **Timeline** at the top of Today in clock
+order; tasks without a time stay in the **Anytime** list below. It's all one list, so one
+completion %, one streak and one set of Insights.
+
+Or type your day the way you'd say it — **+ Add → Type several** — `6:30 wake up`,
+`7 to 9 gym`, `9 to 11 prepare`, `call the bank` — one per line. It reads the times, works
+out am/pm from the order of the lines, treats a line with no time as an anytime task, and
+previews what it understood before adding anything.
+
+Each task can repeat every day, weekdays or weekends (a weekdays-only task doesn't count
+against a Sunday). On today the timeline shows what's happening now, what's next and how
+long is left; step back to a past day and every timed task is either done or missed.
+Overlapping tasks are flagged and open stretches are listed as free time. Tap ✎ to edit
+any task — its time, repeat or priority.
+
 ### The rest
 
 - **Undo on every delete** — tasks, notes, expenses, extras, people, payments, cancelled reminders, even *delete all data*. No "are you sure?" dialogs.
@@ -139,7 +157,7 @@ treatment with their own weekend task list.
 - **Versioned storage** with migrations that run before the app mounts.
 - **Notes** can be colour-coded, tagged, pinned to the top, and searched by title, body or tag.
 - Weekend and holiday quotes swap in automatically for the day you're viewing.
-- Light and dark themes, and keys `1`–`8` for tabs on desktop.
+- Light and dark themes, and keys `1`–`9` for tabs on desktop.
 
 ## Quick start
 

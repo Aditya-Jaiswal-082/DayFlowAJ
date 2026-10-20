@@ -1,5 +1,5 @@
 import { storage } from "./storage.js";
-import { SCHEMA_VERSION, STORAGE_KEYS } from "./constants.js";
+import { DEFAULT_TASKS, SCHEMA_VERSION, STORAGE_KEYS, TASK_CATS } from "./constants.js";
 
 /**
  * Stored-data versioning.
@@ -22,6 +22,7 @@ const DATA_MAP = {
   budgets: [STORAGE_KEYS.budgets, {}],
   people: [STORAGE_KEYS.people, []],
   settlements: [STORAGE_KEYS.settlements, []],
+  schedule: [STORAGE_KEYS.schedule, null],   // legacy Plan tab (v3); folded into tasks by v4
 };
 
 function readState() {
@@ -88,6 +89,65 @@ export function migrateBundle({ version = 1, data = {} }) {
     out.people = Array.isArray(out.people) ? out.people : [];
     out.settlements = Array.isArray(out.settlements) ? out.settlements : [];
     v = 3;
+  }
+
+  if (v < 4) {
+    // The standalone Plan tab merged into Today: a timed block is now just a
+    // regular task that happens to have a time. Blocks become tasks (keeping
+    // their repeat rule and lifecycle) and their ticks move into `checks`, so
+    // nothing already recorded is lost. Ids that would collide with an existing
+    // task are given a fresh one, and the ticks follow.
+    const blocks = Array.isArray(out.schedule) ? out.schedule : [];
+    if (blocks.length) {
+      const base = Array.isArray(out.regular) ? out.regular : DEFAULT_TASKS.map((t) => ({ ...t }));
+      const taken = new Set(base.map((t) => t.id));
+      const idMap = new Map();
+      let next = Date.now();
+      const converted = blocks.map((b) => {
+        let id = b.id;
+        while (taken.has(id)) id = next++;
+        taken.add(id);
+        idMap.set(b.id, id);
+        return {
+          id,
+          text: b.text,
+          cat: b.cat || TASK_CATS.find((c) => c === "Personal") || TASK_CATS[0],
+          priority: "normal",
+          start: b.start,
+          end: b.end ?? null,
+          days: b.days || "all",
+          createdAt: b.createdAt ?? null,
+          archivedAt: b.archivedAt ?? null,
+        };
+      });
+      out.regular = [...base, ...converted];
+
+      if (out.dayData && typeof out.dayData === "object") {
+        const days = {};
+        for (const [key, day] of Object.entries(out.dayData)) {
+          const { scheduleChecks, ...rest } = day || {};
+          if (scheduleChecks && typeof scheduleChecks === "object") {
+            const moved = {};
+            for (const [oldId, ticked] of Object.entries(scheduleChecks)) {
+              const newId = idMap.get(Number.isNaN(Number(oldId)) ? oldId : Number(oldId));
+              if (newId !== undefined) moved[newId] = ticked;
+            }
+            days[key] = { ...rest, checks: { ...(rest.checks || {}), ...moved } };
+          } else {
+            days[key] = day;
+          }
+        }
+        out.dayData = days;
+      }
+    } else if (out.dayData && typeof out.dayData === "object") {
+      // No blocks, but strip any stray empty tick maps so the shape stays clean.
+      out.dayData = Object.fromEntries(Object.entries(out.dayData).map(([key, day]) => {
+        const { scheduleChecks, ...rest } = day || {};
+        return [key, day && scheduleChecks ? rest : day];
+      }));
+    }
+    delete out.schedule;
+    v = 4;
   }
 
   return { version: v, data: out };

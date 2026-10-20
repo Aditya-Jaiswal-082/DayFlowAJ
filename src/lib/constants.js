@@ -90,7 +90,7 @@ export const NOTE_COLORS = [
  * `checks` object and `extra` array to every day.
  */
 export const emptyDay = () => ({
-  checks: {}, extra: [], special: [], mood: "", note: "", holidayChecks: {}, weekendChecks: {}, scheduleChecks: {},
+  checks: {}, extra: [], special: [], mood: "", note: "", holidayChecks: {}, weekendChecks: {},
 });
 
 export const DEFAULT_TASKS = [
@@ -113,7 +113,7 @@ export const DEFAULT_WEEKEND_TASKS = [
 ];
 
 /** Bump this whenever a stored shape changes, and add a step in lib/schema.js. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** Every persisted key, in one place. */
 export const STORAGE_KEYS = {
@@ -131,6 +131,7 @@ export const STORAGE_KEYS = {
   holidayTasks: "rt_holidaytasks",
   holidays: "rt_holidays",
   weekendTasks: "rt_weekendtasks",
+  /** Legacy — the standalone Plan tab (v3). Read once by the v4 migration, never written. */
   schedule: "rt_schedule",
 };
 

@@ -1,28 +1,49 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTracker } from "../context/TrackerContext.jsx";
 import { MOOD_OPTS, PRIORITIES, TASK_CATS } from "../lib/constants.js";
 import { formatWhen } from "../lib/reminders.js";
+import {
+  blockStatus, daySummary, formatClock, formatDuration, formatRange, freeGaps, overlappingIds, periodColor,
+  repeatLabel, splitTimed, spanOf,
+} from "../lib/schedule.js";
+import { useNow } from "../hooks/useNow.js";
 import { gridCols } from "../styles/theme.js";
 import { haptic } from "../lib/haptics.js";
 import {
-  Btn, Card, CircleProgress, DayNav, Empty, Field, Modal, SectionTitle, TaskRow, TiltCard,
-  WhenPicker, whenToTimestamp, whenValue,
+  Btn, Card, CircleProgress, DayNav, Empty, Field, Modal, NowNext, SectionTitle, TaskEditor, TaskRow, TiltCard,
 } from "../components/index.js";
+
+const STATUS = {
+  done: { label: "Done", color: "#10b981" },
+  active: { label: "Now", color: "var(--accent)" },
+  upcoming: { label: "Later", color: "var(--muted)" },
+  missed: { label: "Missed", color: "#ef4444" },
+};
 
 const priorityOf = (val) => PRIORITIES.find((p) => p.val === val) || PRIORITIES[1];
 
-/** Checklists, mood, day note and the quote of the day. */
+/**
+ * One list for the day. A task may carry a time, in which case it sits on the
+ * timeline in clock order; the rest are "anytime". Both feed the same
+ * completion %, streak and Insights. Also: mood, day note, quote.
+ */
 export function TodayTab() {
   const {
-    tasks, stats, quote, catColor, reminders, notifications,
-    addTaskWithReminder, openInsight, selectedDay, isWeekend,
+    tasks, stats, quote, catColor, reminders,
+    openInsight, selectedDay, isWeekend, today, isToday,
   } = useTracker();
+  const nowMin = useNow();
 
-  const [taskModal, setTaskModal] = useState(false);
-  const [text, setText] = useState("");
-  const [cat, setCat] = useState(TASK_CATS[0]);
-  const [priority, setPriority] = useState("normal");
-  const [when, setWhen] = useState(() => whenValue(false));
+  const [editor, setEditor] = useState(null);   // { task: Task | null } while the add/edit modal is open
+
+  const { timed, anytime } = useMemo(() => splitTimed(tasks.dayTasks), [tasks.dayTasks]);
+  const rows = timed.map((task) => {
+    const done = !!tasks.day.checks[task.id];
+    return { task, done, status: blockStatus({ item: task, sorted: timed, nowMin, dayKey: selectedDay, todayKey: today, done }) };
+  });
+  const timeline = daySummary({ items: timed, checks: tasks.day.checks, dayKey: selectedDay, todayKey: today, nowMin });
+  const clash = useMemo(() => overlappingIds(timed), [timed]);
+  const gaps = useMemo(() => freeGaps(timed), [timed]);
 
   const [listModal, setListModal] = useState(null);   // "special" | "extra" | null
   const [listText, setListText] = useState("");
@@ -59,31 +80,6 @@ export function TodayTab() {
       haptic("success");
       setWeekendModal(false);
     }
-  }
-
-  /** High-priority tasks are the ones you most want a nudge for, so opt in by default. */
-  function choosePriority(val) {
-    setPriority(val);
-    if (val === "high") setWhen((w) => ({ ...w, on: true }));
-  }
-
-  function openTaskModal() {
-    setText("");
-    setCat(TASK_CATS[0]);
-    setPriority("normal");
-    setWhen(whenValue(false));
-    setTaskModal(true);
-  }
-
-  async function saveTask() {
-    if (!text.trim()) return;
-    if (when.on && notifications.supported && notifications.permission === "default") {
-      await notifications.request();
-    }
-    const ok = addTaskWithReminder({
-      text, cat, priority, remindAt: when.on ? whenToTimestamp(when) : null,
-    });
-    if (ok) setTaskModal(false);
   }
 
   function saveListItem() {
@@ -168,17 +164,75 @@ export function TodayTab() {
         />
       </Card>
 
+      {timed.length > 0 && (
+        <Card>
+          {isToday && (
+            <div style={{ marginBottom: "0.9rem" }}>
+              <NowNext rows={rows} list={timed} nowMin={nowMin} />
+            </div>
+          )}
+          <SectionTitle
+            hint={[
+              `${timeline.done}/${timeline.total} done`,
+              timeline.missed ? `${timeline.missed} missed` : null,
+              timeline.plannedMin ? `${formatDuration(timeline.plannedMin)} planned` : null,
+            ].filter(Boolean).join(" · ")}
+          >
+            Timeline
+          </SectionTitle>
+          {rows.map(({ task, status }) => {
+            const bell = bells.get(task.id);
+            const p = priorityOf(task.priority);
+            const extra = [
+              task.end != null ? formatDuration(spanOf(task)) : null,
+              task.days ? repeatLabel(task.days) : null,
+              clash.has(task.id) ? "overlaps" : null,
+            ].filter(Boolean);
+            return (
+              <TaskRow
+                key={task.id}
+                text={task.text}
+                cat={task.cat}
+                color={catColor(task.cat)}
+                done={!!tasks.day.checks[task.id]}
+                onToggle={() => tasks.toggleCheck(task.id)}
+                onInspect={() => openInsight({ kind: "task", taskId: task.id })}
+                onEdit={() => setEditor({ task })}
+                onRemove={() => tasks.archive(task.id)}
+                removeTitle="Archive (keeps past days intact)"
+                time={`${formatRange(task)}${extra.length ? ` · ${extra.join(" · ")}` : ""}`}
+                status={STATUS[status]}
+                accent={periodColor(task.start)}
+                highlight={status === "active"}
+                badge={task.priority !== "normal" ? { label: p.label, color: p.color } : null}
+                hint={bell ? `🔔 ${formatWhen(bell.at)}` : null}
+              />
+            );
+          })}
+          {gaps.length > 0 && (
+            <div style={{ marginTop: "0.5rem", fontSize: 12, color: "var(--muted)" }}>
+              <strong style={{ color: "var(--text)" }}>Free: </strong>
+              {gaps.map((g) => `${formatClock(g.from)} – ${formatClock(g.to)} (${formatDuration(g.minutes)})`).join("  ·  ")}
+            </div>
+          )}
+        </Card>
+      )}
+
       <Card>
         <SectionTitle
           hint="Tap a task name to see its pattern"
-          right={<Btn size="sm" onClick={openTaskModal}>+ Add</Btn>}
+          right={<Btn size="sm" onClick={() => setEditor({ task: null })}>+ Add</Btn>}
         >
-          Regular tasks
+          {timed.length ? "Anytime" : "Tasks"}
         </SectionTitle>
-        {tasks.dayTasks.length === 0 ? (
-          <Empty>No regular tasks for this day. Add one to get started.</Empty>
+        {anytime.length === 0 ? (
+          <Empty>
+            {timed.length
+              ? "Nothing without a time today."
+              : "No tasks for this day. Add one — give it a time if you want it on a timeline."}
+          </Empty>
         ) : (
-          tasks.dayTasks.map((t) => {
+          anytime.map((t) => {
             const bell = bells.get(t.id);
             const p = priorityOf(t.priority);
             return (
@@ -190,8 +244,10 @@ export function TodayTab() {
                 done={!!tasks.day.checks[t.id]}
                 onToggle={() => tasks.toggleCheck(t.id)}
                 onInspect={() => openInsight({ kind: "task", taskId: t.id })}
+                onEdit={() => setEditor({ task: t })}
                 onRemove={() => tasks.archive(t.id)}
                 removeTitle="Archive (keeps past days intact)"
+                time={t.days ? repeatLabel(t.days) : null}
                 badge={t.priority !== "normal" ? { label: p.label, color: p.color } : null}
                 hint={bell ? `🔔 ${formatWhen(bell.at)}` : null}
               />
@@ -290,60 +346,7 @@ export function TodayTab() {
         </Card>
       )}
 
-      <Modal
-        open={taskModal}
-        onClose={() => setTaskModal(false)}
-        title="Add regular task"
-        footer={
-          <>
-            <Btn variant="ghost" onClick={() => setTaskModal(false)}>Cancel</Btn>
-            <Btn onClick={saveTask} disabled={!text.trim()}>Add task</Btn>
-          </>
-        }
-      >
-        <div style={{ display: "grid", gap: "0.9rem" }}>
-          <Field label="Task" value={text} onChange={setText} autoFocus placeholder="Drink 2L water" />
-          <Field label="Category" options={TASK_CATS} value={cat} onChange={setCat} />
-
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 5 }}>Priority</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {PRIORITIES.map((p) => {
-                const active = priority === p.val;
-                return (
-                  <button
-                    key={p.val}
-                    type="button"
-                    className="pressable"
-                    onClick={() => choosePriority(p.val)}
-                    style={{
-                      flex: 1,
-                      padding: "0.6rem",
-                      borderRadius: 13,
-                      fontSize: 12.5,
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      border: `1px solid ${active ? p.color : "var(--border)"}`,
-                      background: active ? `${p.color}1f` : "var(--bg-2)",
-                      color: active ? p.color : "var(--muted)",
-                      boxShadow: active ? "var(--shadow-1)" : "var(--shadow-press)",
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                );
-              })}
-            </div>
-            {priority === "high" && (
-              <p style={{ margin: "0.5rem 0 0", fontSize: 12, color: "#f59e0b" }}>
-                High priority — a reminder is switched on for you. Pick the time below.
-              </p>
-            )}
-          </div>
-
-          <WhenPicker value={when} onChange={setWhen} label="Remind me to do this" />
-        </div>
-      </Modal>
+      {editor && <TaskEditor task={editor.task} nowMin={nowMin} onClose={() => setEditor(null)} />}
 
       <Modal
         open={!!listModal}

@@ -26,6 +26,23 @@ export function useNotes({ today, undoable }) {
     return true;
   }, [setNotes, today]);
 
+  /** Edit a note in place — its date and pin stay as they were. */
+  const update = useCallback((id, { title, text, color, tags }) => {
+    const body = String(text || "").trim();
+    if (!body) return false;
+    const tagList = Array.isArray(tags)
+      ? tags
+      : String(tags || "").split(",").map((t) => t.trim()).filter(Boolean);
+    setNotes((prev) => prev.map((n) => (n.id === id ? {
+      ...n,
+      title: String(title || "").trim() || "Untitled",
+      text: body,
+      color: color || n.color,
+      tags: tagList,
+    } : n)));
+    return true;
+  }, [setNotes]);
+
   const remove = useCallback((id) => {
     const note = notes.find((n) => n.id === id);
     if (!note) return;
@@ -56,7 +73,7 @@ export function useNotes({ today, undoable }) {
   }, [notes]);
 
   return useMemo(
-    () => ({ all: notes, add, remove, togglePin, search, replaceAll: setNotes }),
-    [notes, add, remove, togglePin, search, setNotes],
+    () => ({ all: notes, add, update, remove, togglePin, search, replaceAll: setNotes }),
+    [notes, add, update, remove, togglePin, search, setNotes],
   );
 }

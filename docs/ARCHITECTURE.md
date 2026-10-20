@@ -32,7 +32,8 @@ src/
 │
 ├── hooks/                    ── ONE CONCERN EACH ──
 │   ├── useStorage.js         useState that persists (localStorage-safe)
-│   ├── useTasks.js           regular + holiday tasks, holiday marking, per-day records
+│   ├── useTasks.js           regular (optionally timed) + holiday + weekend tasks, per-day records
+│   ├── useNow.js             minutes since midnight, refreshed — drives Now / Next on the timeline
 │   ├── useNotes.js           notes + search
 │   ├── useExpenses.js        expenses + budgets
 │   ├── usePeople.js          the people you split with + payments between you
@@ -53,7 +54,8 @@ src/
 │   ├── insights.js           the day / month / category / task insight engine
 │   ├── splits.js             bill splitting + the per-person khata ledger
 │   ├── reminders.js          scheduling maths, presets, formatting
-│   ├── schema.js             stored-data versioning + migrations
+│   ├── schedule.js           the time manager: parsing "7 to 9 gym", timeline status, free gaps
+│   ├── schema.js             stored-data versioning + migrations (v4 folded the old Plan tab into tasks)
 │   ├── backup.js             export / import with validation
 │   ├── legacyImport.js       upgrades a pre-dayflowaj export into this app's shape
 │   ├── storage.js            localStorage wrapper that cannot throw
@@ -145,6 +147,14 @@ as whole sentences with real numbers in them; that's the part people actually re
 Add it to the matching domain hook, expose it from `TrackerContext`, then read it via
 `useTracker()`. Register the key in `STORAGE_KEYS` (`lib/constants.js`) **and** `DATA_MAP`
 (`lib/schema.js`) so it's included in backups.
+
+### Timed tasks
+
+A task is `{ id, text, cat, priority, createdAt, archivedAt }` plus, optionally,
+`start` / `end` (minutes since midnight; `end: null` is a single moment) and `days`
+(`"weekdays"` / `"weekends"`; absent means every day). `tasksActiveOn` in `lib/stats.js`
+applies `days`, so every percentage, streak and chart respects it automatically.
+`lib/schedule.js` only reads those fields — there is no second list to keep in sync.
 
 ### Change a stored shape
 

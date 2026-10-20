@@ -1,6 +1,5 @@
 import { TodayTab } from "./TodayTab.jsx";
 import { AnalysisTab } from "./AnalysisTab.jsx";
-import { ScheduleTab } from "./ScheduleTab.jsx";
 import { ExpensesTab } from "./ExpensesTab.jsx";
 import { SplitTab } from "./SplitTab.jsx";
 import { RemindersTab } from "./RemindersTab.jsx";
@@ -17,7 +16,6 @@ import { SettingsTab } from "./SettingsTab.jsx";
  */
 export const TABS = [
   { id: "today", label: "Today", icon: "◉", Component: TodayTab },
-  { id: "schedule", label: "Plan", icon: "◷", Component: ScheduleTab },
   { id: "expenses", label: "Money", icon: "▤", Component: ExpensesTab },
   { id: "split", label: "Split", icon: "◑", Component: SplitTab },
   { id: "analysis", label: "Insights", icon: "◫", Component: AnalysisTab },

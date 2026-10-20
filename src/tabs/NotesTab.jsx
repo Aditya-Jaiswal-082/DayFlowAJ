@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTracker } from "../context/TrackerContext.jsx";
 import { formatDate } from "../lib/dates.js";
 import { NOTE_COLORS } from "../lib/constants.js";
-import { Btn, Card, Empty, Field, SectionTitle } from "../components/index.js";
+import { Btn, Card, Empty, Field, Modal, SectionTitle } from "../components/index.js";
 
 export function NotesTab() {
   const { notes, openInsight } = useTracker();
@@ -12,6 +12,20 @@ export function NotesTab() {
   const [tags, setTags] = useState("");
   const [color, setColor] = useState(NOTE_COLORS[0]);
   const [query, setQuery] = useState("");
+
+  const [editing, setEditing] = useState(null);   // { id, title, text, tags, color } while the edit modal is open
+  const patchEdit = (patch) => setEditing((e) => ({ ...e, ...patch }));
+
+  function openEdit(n) {
+    setEditing({
+      id: n.id, title: n.title === "Untitled" ? "" : n.title, text: n.text,
+      tags: (n.tags || []).join(", "), color: n.color || NOTE_COLORS[0],
+    });
+  }
+
+  function saveEdit() {
+    if (editing && notes.update(editing.id, editing)) setEditing(null);
+  }
 
   function save() {
     if (notes.add({ title, text, tags, color })) {
@@ -32,29 +46,7 @@ export function NotesTab() {
           <Field label="Title" value={title} onChange={setTitle} placeholder="Optional" />
           <Field label="Note" rows={4} value={text} onChange={setText} placeholder="Write something…" />
           <Field label="Tags" value={tags} onChange={setTags} placeholder="comma, separated, tags — optional" />
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 5 }}>Colour</div>
-            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
-              {NOTE_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="pressable"
-                  onClick={() => setColor(c)}
-                  title={c}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: "50%",
-                    background: c,
-                    border: color === c ? "2px solid var(--text)" : "2px solid transparent",
-                    boxShadow: color === c ? "var(--shadow-1)" : "none",
-                    cursor: "pointer",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+          <ColorPicker value={color} onChange={setColor} />
         </div>
       </Card>
 
@@ -100,6 +92,7 @@ export function NotesTab() {
                     </button>
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <Btn size="sm" variant="ghost" onClick={() => openEdit(n)} title="Edit note">✎</Btn>
                     <Btn
                       size="sm"
                       variant="ghost"
@@ -139,6 +132,55 @@ export function NotesTab() {
           </div>
         )}
       </Card>
+
+      <Modal
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="Edit note"
+        footer={
+          <>
+            <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
+            <Btn onClick={saveEdit} disabled={!editing?.text.trim()}>Save changes</Btn>
+          </>
+        }
+      >
+        {editing && (
+          <div style={{ display: "grid", gap: "0.8rem" }}>
+            <Field label="Title" value={editing.title} onChange={(v) => patchEdit({ title: v })} placeholder="Optional" />
+            <Field label="Note" rows={6} value={editing.text} onChange={(v) => patchEdit({ text: v })} autoFocus />
+            <Field label="Tags" value={editing.tags} onChange={(v) => patchEdit({ tags: v })} placeholder="comma, separated, tags — optional" />
+            <ColorPicker value={editing.color} onChange={(v) => patchEdit({ color: v })} />
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function ColorPicker({ value, onChange }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 5 }}>Colour</div>
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+        {NOTE_COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className="pressable"
+            onClick={() => onChange(c)}
+            title={c}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: c,
+              border: value === c ? "2px solid var(--text)" : "2px solid transparent",
+              boxShadow: value === c ? "var(--shadow-1)" : "none",
+              cursor: "pointer",
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

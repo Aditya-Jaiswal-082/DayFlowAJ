@@ -83,7 +83,6 @@ export function summarise(data) {
     holidayTasks: (data.holidayTasks || []).length,
     holidays: Object.keys(data.holidays || {}).length,
     weekendTasks: (data.weekendTasks || []).length,
-    schedule: (data.schedule || []).length,
   };
 }
 

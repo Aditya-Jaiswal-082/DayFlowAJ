@@ -61,20 +61,59 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
 
   /* ── regular tasks ── */
 
-  const add = useCallback(({ text, cat, priority = "normal" }) => {
+  /**
+   * `start`/`end` (minutes since midnight) make it a timed task; `days` is its
+   * repeat rule ("all" | "weekdays" | "weekends"). All three are optional — a
+   * plain task is exactly what it always was.
+   */
+  const makeTask = useCallback(({ text, cat, priority = "normal", start, end, days }, id) => {
     const clean = String(text || "").trim();
     if (!clean) return null;
-    const task = {
-      id: Date.now(),
+    const timed = Number.isFinite(start);
+    return {
+      id,
       text: clean,
       cat: cat || TASK_CATS[0],
       priority,
+      ...(timed ? { start, end: Number.isFinite(end) ? end : null } : {}),
+      ...(days && days !== "all" ? { days } : {}),
       createdAt: today,
       archivedAt: null,
     };
+  }, [today]);
+
+  const add = useCallback((fields) => {
+    const task = makeTask(fields, Date.now());
+    if (!task) return null;
     setRegularTasks((prev) => [...prev, task]);
     return task;
-  }, [setRegularTasks, today]);
+  }, [makeTask, setRegularTasks]);
+
+  /** Several at once ("type your day"); ids are made distinct within the batch. */
+  const addMany = useCallback((list) => {
+    const base = Date.now();
+    const made = list.map((fields, i) => makeTask(fields, base + i)).filter(Boolean);
+    if (made.length) setRegularTasks((prev) => [...prev, ...made]);
+    return made;
+  }, [makeTask, setRegularTasks]);
+
+  /**
+   * Edit a task in place. Passing `start: null` turns a timed task back into
+   * an anytime one. Note it applies to every day the task lives on, past
+   * included — archive and re-add instead if history should keep the old shape.
+   */
+  const update = useCallback((id, patch) => {
+    setRegularTasks((prev) => prev.map((t) => {
+      if (t.id !== id) return t;
+      const next = { ...t, ...patch };
+      const text = String(next.text || "").trim();
+      next.text = text || t.text;
+      if (!Number.isFinite(next.start)) { delete next.start; delete next.end; }
+      else if (!Number.isFinite(next.end)) next.end = null;
+      if (!next.days || next.days === "all") delete next.days;
+      return next;
+    }));
+  }, [setRegularTasks]);
 
   const archive = useCallback((id) => {
     const task = regularTasks.find((t) => t.id === id);
@@ -232,10 +271,6 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
     patchDay(selectedDay, { weekendChecks: { ...day.weekendChecks, [id]: !day.weekendChecks[id] } });
   }, [day.weekendChecks, patchDay, selectedDay]);
 
-  const toggleScheduleCheck = useCallback((id) => {
-    patchDay(selectedDay, { scheduleChecks: { ...day.scheduleChecks, [id]: !day.scheduleChecks[id] } });
-  }, [day.scheduleChecks, patchDay, selectedDay]);
-
   return useMemo(() => ({
     all: regularTasks,
     dayTasks,
@@ -244,6 +279,8 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
     day,
     getDay,
     add,
+    addMany,
+    update,
     archive,
     unarchive,
     purge,
@@ -280,16 +317,15 @@ export function useTasks({ today, selectedDay, undoable, onTaskArchived }) {
     unarchiveWeekendTask,
     purgeWeekendTask,
     toggleWeekendCheck,
-    toggleScheduleCheck,
     replaceWeekendTasks: setWeekendTasks,
   }), [
-    regularTasks, dayTasks, archived, dayData, day, getDay, add, archive, unarchive, purge,
+    regularTasks, dayTasks, archived, dayData, day, getDay, add, addMany, update, archive, unarchive, purge,
     toggleCheck, addListItem, toggleListItem, removeListItem, setMood, setNote,
     setRegularTasks, setDayData,
     holidayTasks, dayHolidayTasks, archivedHoliday, holidays, isHoliday, holidayLabel,
     addHoliday, archiveHolidayTask, unarchiveHolidayTask, purgeHolidayTask, toggleHolidayCheck,
     setHoliday, clearHoliday, setHolidayTasks, setHolidays,
     weekendTasks, dayWeekendTasks, archivedWeekend, addWeekend, archiveWeekendTask,
-    unarchiveWeekendTask, purgeWeekendTask, toggleWeekendCheck, toggleScheduleCheck, setWeekendTasks,
+    unarchiveWeekendTask, purgeWeekendTask, toggleWeekendCheck, setWeekendTasks,
   ]);
 }

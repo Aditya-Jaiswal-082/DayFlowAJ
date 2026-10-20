@@ -30,7 +30,7 @@ const { buildBackup, parseBackup, summarise, backupFilename, landingDay } = awai
 const { looksLikeLegacyDayflow, convertLegacyDayflow } = await import("../src/lib/legacyImport.js");
 const {
   toMinutes, toHHMM, formatClock, formatDuration, formatRange, spanOf, parseScheduleText, sortSchedule,
-  scheduleOn, effectiveEnd, blockStatus, daySummary, scheduleAdherence, freeGaps, overlappingIds,
+  isTimed, splitTimed, repeatLabel, repeatValue, effectiveEnd, blockStatus, daySummary, freeGaps, overlappingIds,
 } = await import("../src/lib/schedule.js");
 const {
   change, monthKeyOf, monthLabel, monthDays, recentMonths, anchorDayInMonth, completionTrend, spendTrend,
@@ -128,7 +128,7 @@ const data = {
 };
 
 check("emptyDay returns independent objects", emptyDay().checks !== emptyDay().checks);
-check("dayOf fills every field", Object.keys(dayOf({}, "x")).sort().join() === "checks,extra,holidayChecks,mood,note,scheduleChecks,special,weekendChecks");
+check("dayOf fills every field", Object.keys(dayOf({}, "x")).sort().join() === "checks,extra,holidayChecks,mood,note,special,weekendChecks");
 check("dayOf copies arrays", (dayOf(data, "2026-08-10").extra.push(1), data["2026-08-10"].extra.length === 1));
 check("dayOf copies checks", (dayOf(data, "2026-08-10").checks[9] = true, !data["2026-08-10"].checks[9]));
 check("dayOf copies holidayChecks", (dayOf(data, "2026-08-10").holidayChecks[9] = true, !data["2026-08-10"].holidayChecks?.[9]));
@@ -689,14 +689,37 @@ const prepB = blk(3, 540, 660);
 check("spanOf measures a block and wraps past midnight",
   spanOf(gymB) === 120 && spanOf(blk(9, 1320, 360)) === 480 && spanOf(wakeB) === 0);
 check("sortSchedule orders by start time", sortSchedule([prepB, wakeB, gymB]).map((b) => b.id).join() === "1,2,3");
-check("scheduleOn filters weekday-only and weekend-only blocks", (() => {
+check("tasksActiveOn filters weekday-only and weekend-only tasks", (() => {
   const items = [blk(1, 420, 540, { days: "weekdays" }), blk(2, 600, 660, { days: "weekends" }), blk(3, 700, null)];
-  return scheduleOn(items, "2026-08-10").map((b) => b.id).join() === "1,3"   // a Monday
-    && scheduleOn(items, "2026-08-09").map((b) => b.id).join() === "2,3";    // a Sunday
+  return tasksActiveOn(items, "2026-08-10").map((b) => b.id).join() === "1,3"   // a Monday
+    && tasksActiveOn(items, "2026-08-09").map((b) => b.id).join() === "2,3";    // a Sunday
 })());
-check("scheduleOn respects createdAt and archivedAt like tasks",
-  scheduleOn([blk(1, 420, 540, { createdAt: "2026-08-10" })], "2026-08-09").length === 0
-  && scheduleOn([blk(1, 420, 540, { createdAt: "2026-08-10" })], "2026-08-10").length === 1);
+check("tasksActiveOn still ignores days on tasks that have none",
+  tasksActiveOn([{ id: 1, text: "x" }], "2026-08-09").length === 1 && tasksActiveOn([{ id: 1, days: "all" }], "2026-08-09").length === 1);
+check("a weekday-only task does not count against a weekend's percentage", (() => {
+  const tasks = [{ id: 1, text: "a" }, { id: 2, text: "b", days: "weekdays", start: 420 }];
+  return completionPct({ "2026-08-09": { checks: { 1: true } } }, "2026-08-09", tasks) === 100;
+})());
+check("tasksActiveOn respects createdAt and archivedAt for timed tasks",
+  tasksActiveOn([blk(1, 420, 540, { createdAt: "2026-08-10" })], "2026-08-09").length === 0
+  && tasksActiveOn([blk(1, 420, 540, { createdAt: "2026-08-10" })], "2026-08-10").length === 1
+  && tasksActiveOn([blk(1, 420, 540, { archivedAt: "2026-08-10" })], "2026-08-10").length === 0);
+check("isTimed tells a timed task from an anytime one", isTimed(gymB) && isTimed(blk(8, 0, null)) && !isTimed({ id: 1, text: "x" }) && !isTimed({ start: null }));
+check("splitTimed orders the timeline and keeps anytime order", (() => {
+  const any1 = { id: 11, text: "a" }; const any2 = { id: 12, text: "b" };
+  const r = splitTimed([any1, prepB, wakeB, any2, gymB]);
+  return r.timed.map((t) => t.id).join() === "1,2,3" && r.anytime.map((t) => t.id).join() === "11,12";
+})());
+check("repeat labels and values round-trip", repeatValue(repeatLabel("weekdays")) === "weekdays" && repeatValue(repeatLabel(undefined)) === "all");
+check("allowUntimed turns a line without a time into an anytime task", (() => {
+  const r = parseScheduleText("7 to 9 gym\ncall the bank", { allowUntimed: true });
+  return r.items.length === 2 && r.items[1].start === null && r.items[1].text === "Call the bank" && r.errors.length === 0;
+})());
+check("allowUntimed still reports a time with no name", parseScheduleText("8 am", { allowUntimed: true }).errors.length === 1);
+check("an untimed line does not disturb the am/pm context of the next", (() => {
+  const r = parseScheduleText("9 to 11 prepare\nbuy milk\n1 to 2 lunch", { allowUntimed: true });
+  return r.items[2].start === 780;
+})());
 check("a single moment lasts until the next block", effectiveEnd(wakeB, sortSchedule([wakeB, gymB])) === 420);
 check("a last single moment lasts half an hour", effectiveEnd(wakeB, [wakeB]) === 420);
 
@@ -720,12 +743,6 @@ check("daySummary adds up planned and finished time", (() => {
 })());
 check("daySummary of an empty day is zeros, not NaN", daySummary({ items: [], checks: {}, dayKey: "x", todayKey: "x", nowMin: 0 }).pct === 0);
 
-check("scheduleAdherence reports a percentage per day", (() => {
-  const r = scheduleAdherence(L, { "2026-08-10": { scheduleChecks: { 1: true, 2: true } } }, ["2026-08-10"]);
-  return r[0].done === 2 && r[0].total === 3 && r[0].pct === 67;
-})());
-check("scheduleAdherence is null when nothing was scheduled", scheduleAdherence([], {}, ["2026-08-10"])[0].pct === null);
-
 check("freeGaps finds open stretches between blocks", (() => {
   const g = freeGaps(sortSchedule([gymB, blk(4, 780, 840)]));
   return g.length === 1 && g[0].from === 540 && g[0].to === 780 && g[0].minutes === 240;
@@ -737,15 +754,69 @@ check("overlappingIds flags colliding blocks", (() => {
   return ids.has(2) && ids.has(6) && !ids.has(7);
 })());
 check("back-to-back blocks do not overlap", overlappingIds(L).size === 0);
-check("a schedule survives a backup round trip", (() => {
-  const back = parseBackup(JSON.stringify(buildBackup({ schedule: [gymB] })));
-  return back.schedule.length === 1 && summarise(back).schedule === 1;
+check("a v3 backup with Plan blocks is folded into tasks on import", (() => {
+  const back = parseBackup(JSON.stringify({
+    app: "routine-tracker", version: 3,
+    data: { regular: [{ id: 1, text: "Read", cat: "Learning" }], schedule: [{ ...gymB, id: 50 }] },
+  }));
+  const t = back.regular.find((x) => x.id === 50);
+  return back.schedule === undefined && back.regular.length === 2 && t.start === 420 && t.end === 540 && t.text === "b2";
 })());
-check("a corrupted schedule section is rejected", (() => {
+check("a corrupted schedule section is still rejected", (() => {
   try { parseBackup(JSON.stringify({ app: "routine-tracker", version: 3, data: { schedule: "nope" } })); return false; }
   catch { return true; }
 })());
-check("a schedule tick alone counts as a day with signal", hasDaySignal({ checks: {}, scheduleChecks: { 1: true } }));
+check("a day with only a ticked timed task has signal", hasDaySignal({ checks: { 50: true } }));
+
+group("plan → today migration (v3 → v4)");
+const v3data = () => ({
+  regular: [{ id: 1, text: "Read", cat: "Learning", priority: "normal", createdAt: null, archivedAt: null }],
+  schedule: [
+    { id: 2, start: 420, end: 540, text: "Gym", days: "weekdays", createdAt: "2026-08-01", archivedAt: null },
+    { id: 3, start: 390, end: null, text: "Wake up", days: "all", createdAt: null, archivedAt: "2026-08-20" },
+  ],
+  dayData: {
+    "2026-08-03": { checks: { 1: true }, scheduleChecks: { 2: true, 3: false }, note: "kept" },
+    "2026-08-04": { checks: {}, scheduleChecks: {} },
+  },
+});
+const m4 = migrateBundle({ version: 3, data: v3data() });
+check("migration reaches the current version", m4.version === SCHEMA_VERSION && SCHEMA_VERSION === 4);
+check("blocks become tasks with their time, repeat rule and lifecycle", (() => {
+  const g = m4.data.regular.find((t) => t.id === 2);
+  const w = m4.data.regular.find((t) => t.id === 3);
+  return g.start === 420 && g.end === 540 && g.days === "weekdays" && g.createdAt === "2026-08-01" && g.priority === "normal"
+    && w.end === null && w.archivedAt === "2026-08-20";
+})());
+check("existing tasks are kept untouched", m4.data.regular[0].id === 1 && m4.data.regular.length === 3);
+check("schedule ticks move into checks", m4.data.dayData["2026-08-03"].checks[2] === true && m4.data.dayData["2026-08-03"].checks[1] === true);
+check("unticked entries stay unticked", !m4.data.dayData["2026-08-03"].checks[3]);
+check("scheduleChecks and schedule are gone", m4.data.schedule === undefined
+  && Object.values(m4.data.dayData).every((d) => d.scheduleChecks === undefined));
+check("other day fields survive", m4.data.dayData["2026-08-03"].note === "kept");
+check("the migration does not mutate its input", (() => {
+  const input = v3data();
+  migrateBundle({ version: 3, data: input });
+  return input.schedule.length === 2 && input.dayData["2026-08-03"].scheduleChecks[2] === true && input.regular.length === 1;
+})());
+check("a block id that collides with a task gets a fresh id, and its ticks follow", (() => {
+  const d = v3data();
+  d.schedule[0].id = 1;   // collides with "Read"
+  d.dayData["2026-08-03"].scheduleChecks = { 1: true };
+  d.dayData["2026-08-03"].checks = {};
+  const r = migrateBundle({ version: 3, data: d }).data;
+  const moved = r.regular.find((t) => t.text === "Gym");
+  return moved.id !== 1 && r.regular.filter((t) => t.id === 1).length === 1 && r.dayData["2026-08-03"].checks[moved.id] === true
+    && !r.dayData["2026-08-03"].checks[1];
+})());
+check("with no Plan blocks, nothing changes but the version", (() => {
+  const r = migrateBundle({ version: 3, data: { regular: [{ id: 1, text: "x" }], dayData: { a: { checks: { 1: true } } } } });
+  return r.version === 4 && r.data.regular.length === 1 && r.data.dayData.a.checks[1] === true;
+})());
+check("with blocks but no stored task list, the default tasks are kept alongside", (() => {
+  const r = migrateBundle({ version: 3, data: { schedule: [{ id: 99, start: 420, end: null, text: "Gym", days: "all" }] } }).data;
+  return r.regular.length === DEFAULT_TASKS.length + 1 && r.regular.some((t) => t.id === 99);
+})());
 
 /* ── config integrity ──────────────────────────────────────────────────── */
 group("config");

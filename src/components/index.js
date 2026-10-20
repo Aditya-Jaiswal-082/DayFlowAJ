@@ -25,4 +25,6 @@ export { TabBar } from "./TabBar.jsx";
 export { BottomNav } from "./BottomNav.jsx";
 export { ToastHost } from "./ToastHost.jsx";
 export { InsightSheet } from "./InsightSheet.jsx";
+export { NowNext } from "./NowNext.jsx";
+export { TaskEditor } from "./TaskEditor.jsx";
 export { WhenPicker, whenValue, whenToTimestamp } from "./WhenPicker.jsx";

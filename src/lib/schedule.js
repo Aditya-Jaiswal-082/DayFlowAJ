@@ -1,17 +1,14 @@
-import { isWeekendKey } from "./dates.js";
-import { tasksActiveOn } from "./stats.js";
-
 /**
- * The time manager: a daily timetable of blocks ("6:30 wake up",
- * "7 to 9 gym"). A block is `{ id, start, end, text, days, createdAt,
- * archivedAt }` with `start`/`end` as minutes since midnight and `end: null`
- * for a single moment. An `end` at or before `start` means the block runs
- * past midnight.
+ * The time manager. It is not a separate list: a regular task may *optionally*
+ * carry a time — `{ start, end, days }` with `start`/`end` as minutes since
+ * midnight, `end: null` for a single moment, and `days` one of REPEAT_OPTIONS.
+ * An `end` at or before `start` means the task runs past midnight. A task with
+ * no `start` is "anytime". Lifecycle (createdAt / archivedAt) and completion
+ * are the ordinary task ones, so a timed task counts toward the same
+ * percentage, streak and Insights as every other.
  *
  * Pure — no React, no storage — so the parser and the status maths are
- * testable in plain Node. Lifecycle (createdAt / archivedAt) works exactly
- * like regular tasks, so a day in the past keeps showing the blocks that were
- * really on it.
+ * testable in plain Node.
  */
 
 export const DAY_MIN = 1440;
@@ -21,6 +18,12 @@ export const REPEAT_OPTIONS = [
   { value: "weekdays", label: "Weekdays only" },
   { value: "weekends", label: "Weekends only" },
 ];
+
+export const repeatLabel = (days) => (REPEAT_OPTIONS.find((o) => o.value === days) || REPEAT_OPTIONS[0]).label;
+export const repeatValue = (label) => (REPEAT_OPTIONS.find((o) => o.label === label) || REPEAT_OPTIONS[0]).value;
+
+/** Tint for a timed task, by the part of the day it starts in. */
+export const periodColor = (m) => (m < 300 ? "#6366f1" : m < 720 ? "#f59e0b" : m < 1020 ? "#06b6d4" : m < 1260 ? "#a855f7" : "#6366f1");
 
 /* ── clock helpers ─────────────────────────────────────────────────────── */
 
@@ -130,9 +133,10 @@ const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
  *   "6:30 wake up"   "6 30 wakeup"   "6.30am wake up"
  *   "7 to 9 gym"     "7-9 gym"       "9 - 11:30 prepare"
  * Returns `{ items: [{ start, end, text }], errors: [line, …] }` — a line that
- * can't be read is reported rather than guessed at.
+ * can't be read is reported rather than guessed at. With `allowUntimed`, a line
+ * that doesn't begin with a number becomes an anytime task (`start: null`).
  */
-export function parseScheduleText(text) {
+export function parseScheduleText(text, { allowUntimed = false } = {}) {
   const items = [];
   const errors = [];
   let prev = null;
@@ -142,7 +146,11 @@ export function parseScheduleText(text) {
     if (!line) return;
 
     const a = readTime(line);
-    if (!a) { errors.push(raw.trim()); return; }
+    if (!a) {
+      if (allowUntimed) items.push({ start: null, end: null, text: capitalise(line) });
+      else errors.push(raw.trim());
+      return;
+    }
 
     let rest = line.slice(a.length);
     let b = null;
@@ -166,21 +174,23 @@ export function parseScheduleText(text) {
   return { items, errors };
 }
 
-/* ── a day's timetable ─────────────────────────────────────────────────── */
+/* ── a day's timeline ──────────────────────────────────────────────────── */
+
+/** True when a task has a time of day (otherwise it is "anytime"). */
+export function isTimed(task) {
+  return Number.isFinite(task?.start);
+}
+
+/** A day's tasks split into the timeline (sorted by clock) and the anytime list (order kept). */
+export function splitTimed(dayTasks) {
+  return {
+    timed: sortSchedule(dayTasks.filter(isTimed)),
+    anytime: dayTasks.filter((t) => !isTimed(t)),
+  };
+}
 
 export function sortSchedule(items) {
   return [...items].sort((a, b) => a.start - b.start || (a.end ?? a.start) - (b.end ?? b.start));
-}
-
-/** The blocks that belong to a day: alive on it, and repeating on its weekday. */
-export function scheduleOn(items, dayKey) {
-  const weekend = isWeekendKey(dayKey);
-  const alive = tasksActiveOn(items, dayKey).filter((i) => {
-    if (i.days === "weekdays") return !weekend;
-    if (i.days === "weekends") return weekend;
-    return true;
-  });
-  return sortSchedule(alive);
 }
 
 /**
@@ -222,16 +232,6 @@ export function daySummary({ items, checks, dayKey, todayKey, nowMin }) {
     pct: total ? Math.round((done / total) * 100) : 0,
     plannedMin, doneMin,
   };
-}
-
-/** Per-day adherence over a run of day keys; `pct` is null when nothing was scheduled. */
-export function scheduleAdherence(items, dayData, keys) {
-  return keys.map((key) => {
-    const list = scheduleOn(items, key);
-    const checks = dayData[key]?.scheduleChecks || {};
-    const done = list.filter((i) => checks[i.id]).length;
-    return { key, total: list.length, done, pct: list.length ? Math.round((done / list.length) * 100) : null };
-  });
 }
 
 /** Open stretches between blocks — a single moment is treated as taking 15 minutes. */
