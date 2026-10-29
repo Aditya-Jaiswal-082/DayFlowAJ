@@ -92,5 +92,5 @@ export const APP_FONT =
 export const gridCols = (min = 260) => ({
   display: "grid",
   gap: "0.75rem",
-  gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`,
+  gridTemplateColumns: `repeat(auto-fit, minmax(min(${min}px, 100%), 1fr))`,
 });

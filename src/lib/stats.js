@@ -158,3 +158,29 @@ export function budgetSummary(rows) {
 export function historyKeys(dayData, recentKeys) {
   return [...new Set([...Object.keys(dayData), ...recentKeys])].sort((a, b) => (a < b ? 1 : -1));
 }
+
+/**
+ * The whole expense log grouped by month, newest first, for the History list.
+ * Within a month, newest day first (then newest entry). An entry with no date
+ * is filed under "undated" at the end rather than dropped, and one with no
+ * description is kept as it is — nothing logged is ever hidden.
+ * @returns {{key:string, items:object[], total:number}[]}
+ */
+export function groupExpensesByMonth(expenses) {
+  const dated = (e) => String(e.date || "");
+  const sorted = [...expenses].sort((a, b) => dated(b).localeCompare(dated(a)) || (b.id || 0) - (a.id || 0));
+  const groups = [];
+  const byKey = new Map();
+  for (const e of sorted) {
+    const key = e.date ? String(e.date).slice(0, 7) : "undated";
+    let g = byKey.get(key);
+    if (!g) {
+      g = { key, items: [], total: 0 };
+      byKey.set(key, g);
+      groups.push(g);
+    }
+    g.items.push(e);
+    g.total += Number(e.amount) || 0;
+  }
+  return groups;
+}

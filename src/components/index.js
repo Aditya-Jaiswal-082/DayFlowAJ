@@ -15,7 +15,7 @@ export { Segmented } from "./Segmented.jsx";
 export { TiltCard } from "./TiltCard.jsx";
 export { TaskRow } from "./TaskRow.jsx";
 export { Avatar } from "./Avatar.jsx";
-export { SplitPicker, splitValue, splitInput } from "./SplitPicker.jsx";
+export { SplitPicker, splitValue, splitInput, paidGap } from "./SplitPicker.jsx";
 export { ChartFrame } from "./ChartFrame.jsx";
 export { Logo, Wordmark } from "./Logo.jsx";
 export { AppBar } from "./AppBar.jsx";

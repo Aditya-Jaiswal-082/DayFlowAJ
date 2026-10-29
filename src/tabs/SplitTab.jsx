@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTracker } from "../context/TrackerContext.jsx";
 import { formatDate, getTodayKey } from "../lib/dates.js";
 import { money } from "../lib/format.js";
-import { ME, nameOf, settleSuggestion, shareOf, splitExpenses } from "../lib/splits.js";
+import { ME, involves, nameOf, owedBetween, payersOf, settleSuggestion, splitExpenses } from "../lib/splits.js";
 import { gridCols } from "../styles/theme.js";
 import {
   Avatar, Btn, Card, Empty, Field, Modal, SectionTitle, Segmented, StatTile,
@@ -62,7 +62,7 @@ export function SplitTab() {
 
   function removePerson(row) {
     const usedIn = shared.filter(
-      (e) => shareOf(e.split, row.personId) > 0 || e.split.payerId === row.personId,
+      (e) => involves(e.split, row.personId),
     ).length;
     const result = people.remove(row.personId, { usedIn });
     if (result === "in-use") {
@@ -180,8 +180,13 @@ export function SplitTab() {
         ) : (
           <div style={{ display: "grid", gap: 7 }}>
             {shared.slice(0, 15).map((e) => {
-              const iPaid = e.split.payerId === ME;
-              const others = e.split.shares.filter((s) => s.id !== ME);
+              const payers = payersOf(e.split);
+              const paidLabel = payers.length > 1
+                ? payers.map((x) => `${x.id === ME ? "you" : nameOf(people.all, x.id)} paid ${money(x.amount)}`).join(" · ")
+                : payers[0]?.id === ME ? "you paid" : `${nameOf(people.all, payers[0]?.id)} paid`;
+              const net = e.split.shares
+                .filter((s) => s.id !== ME)
+                .reduce((sum, o) => sum + owedBetween(e.split, ME, o.id), 0);
               return (
                 <div
                   key={e.id}
@@ -196,7 +201,7 @@ export function SplitTab() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-word" }}>{e.desc}</div>
                       <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
-                        {formatDate(e.date)} · {e.cat} · {iPaid ? "you paid" : `${nameOf(people.all, e.split.payerId)} paid`}
+                        {formatDate(e.date)} · {e.cat} · {paidLabel}
                       </div>
                     </div>
                     <span style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{money(e.amount)}</span>
@@ -219,7 +224,7 @@ export function SplitTab() {
                     ))}
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>
                       {e.split.mode === "equal" ? `split ${e.split.shares.length} ways` : "custom split"}
-                      {iPaid && others.length ? ` · ${money(others.reduce((s, o) => s + o.amount, 0))} owed to you` : ""}
+                      {net > 0 ? ` · ${money(net)} owed to you` : net < 0 ? ` · you owe ${money(-net)}` : ""}
                     </span>
                   </div>
                 </div>

@@ -61,20 +61,88 @@ export function splitEqually(total, count) {
 
 /**
  * Build the split block stored on an expense.
- * @param {{total:number, payerId:string, participantIds:string[], mode:"equal"|"custom", custom?:Object}} input
- * @returns {{payerId:string, mode:string, shares:{id:string, amount:number}[]}|null}
+ * `shares` is what each person *should* bear. `paid` is what each person
+ * actually put in — leave it out when one person covered the whole bill
+ * (`payerId`), pass `{ [id]: amount }` when several people chipped in. The
+ * two are independent: the khata works out who owes whom from the difference.
+ *
+ * @param {{total:number, payerId:string, participantIds:string[], mode:"equal"|"custom", custom?:Object, paid?:Object}} input
+ * @returns {{payerId:string, mode:string, shares:{id:string, amount:number}[], paid?:Object}|null}
  */
-export function buildSplit({ total, payerId = ME, participantIds = [], mode = "equal", custom = {} }) {
+export function buildSplit({ total, payerId = ME, participantIds = [], mode = "equal", custom = {}, paid = null }) {
   const ids = [...new Set(participantIds)].filter(Boolean);
   if (!ids.length || toPaise(total) <= 0) return null;
 
-  if (mode === "custom") {
-    const shares = ids.map((id) => ({ id, amount: toRupees(toPaise(custom[id])) }));
-    return { payerId, mode: "custom", shares };
-  }
+  const shares = mode === "custom"
+    ? ids.map((id) => ({ id, amount: toRupees(toPaise(custom[id])) }))
+    : splitEqually(total, ids.length).map((amount, i) => ({ id: ids[i], amount }));
+  const block = { payerId, mode: mode === "custom" ? "custom" : "equal", shares };
 
-  const amounts = splitEqually(total, ids.length);
-  return { payerId, mode: "equal", shares: ids.map((id, i) => ({ id, amount: amounts[i] })) };
+  // Several people paid → record who put in what; the "payer" shown is whoever put in most.
+  const puts = Object.entries(paid || {})
+    .map(([id, v]) => [id, toPaise(v)])
+    .filter(([, p]) => p > 0);
+  if (puts.length > 1) {
+    block.paid = Object.fromEntries(puts.map(([id, p]) => [id, toRupees(p)]));
+    block.payerId = puts.reduce((best, cur) => (cur[1] > best[1] ? cur : best))[0];
+  } else if (puts.length === 1) {
+    block.payerId = puts[0][0];
+  }
+  return block;
+}
+
+/** Paise each person put in. Bills without a `paid` map were covered by `payerId`. */
+function paidPaise(split) {
+  const total = (split.shares || []).reduce((s, r) => s + toPaise(r.amount), 0);
+  if (split.paid && typeof split.paid === "object") {
+    const out = {};
+    for (const [id, v] of Object.entries(split.paid)) {
+      const p = toPaise(v);
+      if (p > 0) out[id] = p;
+    }
+    if (Object.keys(out).length) return out;
+  }
+  return { [split.payerId]: total };
+}
+
+/** Everyone who paid on a bill, with how much — one entry for the usual single-payer bill. */
+export const payersOf = (split) =>
+  Object.entries(paidPaise(split)).map(([id, p]) => ({ id, amount: toRupees(p) }));
+
+export const paidOf = (split, id) => toRupees(paidPaise(split)[id] || 0);
+
+/** Rupees `b` owes `a` on one bill (negative: `a` owes `b`). */
+export const owedBetween = (split, a, b) => toRupees(pairOwes(split, a, b));
+
+/** True when the person shared in the bill or paid towards it. */
+export const involves = (split, id) => shareOf(split, id) > 0 || paidOf(split, id) > 0;
+
+/** How far the money put in is from the bill (rupees): 0 means it adds up. */
+export function paidDifference(split, total) {
+  return toRupees(toPaise(total) - Object.values(paidPaise(split)).reduce((s, p) => s + p, 0));
+}
+
+/**
+ * On one bill, how many paise `b` owes `a` (negative: `a` owes `b`).
+ * Each person's balance is what they put in minus their share. Whoever is
+ * behind pays whoever is ahead, in proportion to how far ahead each is — with
+ * a single payer that is simply "each person owes the payer their share".
+ */
+function pairOwes(split, a, b) {
+  const paid = paidPaise(split);
+  const ids = new Set([...(split.shares || []).map((s) => s.id), ...Object.keys(paid)]);
+  const net = {};
+  let credit = 0;
+  ids.forEach((id) => {
+    net[id] = (paid[id] || 0) - toPaise(shareOf(split, id));
+    if (net[id] > 0) credit += net[id];
+  });
+  if (!credit) return 0;
+  const na = net[a] || 0;
+  const nb = net[b] || 0;
+  if (na > 0 && nb < 0) return Math.round((-nb * na) / credit);
+  if (na < 0 && nb > 0) return -Math.round((-na * nb) / credit);
+  return 0;
 }
 
 export const splitTotal = (split) =>
@@ -110,15 +178,13 @@ export function balanceWith({ expenses, settlements, personId }) {
   const entries = [];
 
   splitExpenses(expenses).forEach((e) => {
-    const theirShare = toPaise(shareOf(e.split, personId));
-    const myShare = toPaise(shareOf(e.split, ME));
-
-    if (e.split.payerId === ME && theirShare > 0) {
-      owesMePaise += theirShare;
-      entries.push({ kind: "expense", id: e.id, date: e.date, desc: e.desc, cat: e.cat, amount: toRupees(theirShare), direction: "in" });
-    } else if (e.split.payerId === personId && myShare > 0) {
-      iOwePaise += myShare;
-      entries.push({ kind: "expense", id: e.id, date: e.date, desc: e.desc, cat: e.cat, amount: toRupees(myShare), direction: "out" });
+    const owed = pairOwes(e.split, ME, personId);   // + they owe you, − you owe them
+    if (owed > 0) {
+      owesMePaise += owed;
+      entries.push({ kind: "expense", id: e.id, date: e.date, desc: e.desc, cat: e.cat, amount: toRupees(owed), direction: "in" });
+    } else if (owed < 0) {
+      iOwePaise += -owed;
+      entries.push({ kind: "expense", id: e.id, date: e.date, desc: e.desc, cat: e.cat, amount: toRupees(-owed), direction: "out" });
     }
   });
 
@@ -182,10 +248,10 @@ export function personInsight({ expenses, settlements, people, personId }) {
 
   const b = balanceWith({ expenses, settlements, personId });
   const shared = splitExpenses(expenses).filter(
-    (e) => shareOf(e.split, personId) > 0 || (e.split.payerId === personId && shareOf(e.split, ME) > 0),
+    (e) => involves(e.split, personId) && involves(e.split, ME),
   );
   const biggest = shared.reduce((a, e) => ((Number(e.amount) || 0) > (Number(a?.amount) || 0) ? e : a), null);
-  const theyPaid = shared.filter((e) => e.split.payerId === personId).length;
+  const theyPaid = shared.filter((e) => paidOf(e.split, personId) > 0).length;
 
   const facts = [];
   if (b.net > 0) facts.push(`${person.name} owes you ${money(b.net)}.`);

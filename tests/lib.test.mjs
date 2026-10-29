@@ -19,7 +19,7 @@ const { storage } = await import("../src/lib/storage.js");
 const {
   dayOf, countsFor, completionPct, buildTrend, buildMood, buildRadar, currentStreak,
   tasksActiveOn, sortByPriority, expenseTotals, expensesByCategory, expensesByDay,
-  budgetRows, budgetSummary, historyKeys, hasDaySignal,
+  budgetRows, budgetSummary, historyKeys, hasDaySignal, groupExpensesByMonth,
 } = await import("../src/lib/stats.js");
 const {
   atOn, defaultTime, formatWhen, relativeWhen, presetTime, splitWhen, timeOf,
@@ -38,7 +38,7 @@ const {
 } = await import("../src/lib/insights.js");
 const {
   ME, splitEqually, buildSplit, splitTotal, splitDifference, shareOf, isSplit, splitExpenses,
-  perHead, balanceWith, ledger, ledgerTotals, settleSuggestion, makeSettlement, makePerson,
+  perHead, balanceWith, ledger, owedBetween, payersOf, paidOf, paidDifference, involves, ledgerTotals, settleSuggestion, makeSettlement, makePerson,
   initialsOf, nameOf, personInsight, personColor,
 } = await import("../src/lib/splits.js");
 const {
@@ -817,6 +817,66 @@ check("with blocks but no stored task list, the default tasks are kept alongside
   const r = migrateBundle({ version: 3, data: { schedule: [{ id: 99, start: 420, end: null, text: "Gym", days: "all" }] } }).data;
   return r.regular.length === DEFAULT_TASKS.length + 1 && r.regular.some((t) => t.id === 99);
 })());
+
+group("expense history & the split flow");
+const log = [
+  { id: 1, amount: 100, desc: "Lunch", cat: "Food", date: "2026-09-30" },
+  { id: 2, amount: 50, desc: "", cat: "", date: "2026-10-02" },
+  { id: 3, amount: 25, desc: "Tea", cat: "Food", date: "2026-10-02" },
+  { id: 4, amount: 10, desc: "Old import" },
+  { id: 5, amount: 40, desc: "Cab", cat: "Travel", date: "2026-10-20" },
+];
+const byMonth = groupExpensesByMonth(log);
+check("history groups by month, newest month first", byMonth.map((g) => g.key).join() === "2026-10,2026-09,undated");
+check("within a month, newest day first, then newest entry", byMonth[0].items.map((e) => e.id).join() === "5,3,2");
+check("month totals add up", byMonth[0].total === 115 && byMonth[1].total === 100);
+check("an entry with no description is kept, not dropped", byMonth[0].items.some((e) => e.id === 2 && !e.desc));
+check("an entry with no date is filed under undated", byMonth[2].items[0].id === 4);
+check("nothing is lost in grouping", byMonth.reduce((n, g) => n + g.items.length, 0) === log.length);
+check("an empty log has no groups", groupExpensesByMonth([]).length === 0);
+
+const pal = { id: "p1", name: "Pal" };
+const withPal = buildSplit({ total: 200, payerId: ME, participantIds: [ME, pal.id] });
+const bill = { id: 9, amount: 200, desc: "Dinner", cat: "Food", date: "2026-10-20", split: withPal };
+check("a bill split with a friend shows in the khata", ledger({ expenses: [bill], settlements: [], people: [pal] })[0].owesMe === 100);
+const aloneOnly = buildSplit({ total: 200, payerId: ME, participantIds: [ME] });
+check("a 'split' with only you in it leaves the khata empty (why the form insists on a second person)",
+  ledger({ expenses: [{ ...bill, split: aloneOnly }], settlements: [], people: [pal] })[0].owesMe === 0);
+check("a friend paying shows what you owe", ledger({
+  expenses: [{ ...bill, split: buildSplit({ total: 200, payerId: pal.id, participantIds: [ME, pal.id] }) }],
+  settlements: [], people: [pal],
+})[0].iOwe === 100);
+
+group("several people paying one bill");
+// ₹79 split equally between two; you put in 78, your friend put in 1.
+const two = buildSplit({ total: 79, payerId: ME, participantIds: [ME, pal.id], paid: { [ME]: 78, [pal.id]: 1 } });
+const twoBill = { id: 20, amount: 79, desc: "Groceries", cat: "Food", date: "2026-10-22", split: two };
+check("equal shares of 79 are 39.50 each", two.shares.map((x) => x.amount).join() === "39.5,39.5");
+check("both payments are recorded", paidOf(two, ME) === 78 && paidOf(two, pal.id) === 1);
+check("the biggest payer is the bill's payer", two.payerId === ME);
+check("what was paid adds up to the bill", paidDifference(two, 79) === 0);
+check("your friend owes you 38.50 (their 39.50 share minus the 1 they paid)", owedBetween(two, ME, pal.id) === 38.5);
+check("and you are owed the same from their side", owedBetween(two, pal.id, ME) === -38.5);
+check("the khata adds it up by itself", ledger({ expenses: [twoBill], settlements: [], people: [pal] })[0].net === 38.5);
+check("the ledger totals pick it up", ledgerTotals(ledger({ expenses: [twoBill], settlements: [], people: [pal] })).youllGet === 38.5);
+check("a settlement then reduces it", ledger({
+  expenses: [twoBill], settlements: [makeSettlement({ personId: pal.id, amount: 38.5, direction: "in", date: "2026-10-23" })], people: [pal],
+})[0].net === 0);
+check("an unbalanced payment is flagged", paidDifference(buildSplit({ total: 79, participantIds: [ME, pal.id], paid: { [ME]: 70, [pal.id]: 1 } }), 79) === 8);
+check("one entry in paid is the ordinary single-payer bill", (() => {
+  const b = buildSplit({ total: 100, participantIds: [ME, pal.id], paid: { [pal.id]: 100 } });
+  return b.paid === undefined && b.payerId === pal.id && owedBetween(b, ME, pal.id) === -50;
+})());
+check("single-payer bills still work with no paid map", owedBetween(withPal, ME, pal.id) === 100 && payersOf(withPal).length === 1);
+check("involves covers sharers and payers", involves(two, pal.id) && !involves(two, "stranger"));
+
+// three people, two paid
+const q = { id: "q1", name: "Q" };
+const three = buildSplit({ total: 90, participantIds: [ME, pal.id, q.id], paid: { [ME]: 50, [pal.id]: 40 } });
+check("three-way bill: shares are 30 each", three.shares.every((x) => x.amount === 30));
+check("the one who didn't pay owes the two who did, in proportion", owedBetween(three, ME, q.id) === 20 && owedBetween(three, pal.id, q.id) === 10);
+check("people ahead and behind don't owe each other directly", owedBetween(three, ME, pal.id) === 0);
+check("three-way: every rupee owed is accounted for", owedBetween(three, ME, q.id) + owedBetween(three, pal.id, q.id) === 30);
 
 /* ── config integrity ──────────────────────────────────────────────────── */
 group("config");

@@ -14,12 +14,14 @@ export function useExpenses({ today, undoable }) {
   const add = useCallback(({ amount, desc, cat, date, split = null }) => {
     const value = parseFloat(amount);
     if (!Number.isFinite(value) || value <= 0) return false;
+    const what = String(desc || "").trim();
+    if (!what) return false;   // a description is required; the category is not
     setExpenses((prev) => [
       {
         id: Date.now(),
         amount: value,
-        desc: String(desc || "").trim() || cat,
-        cat,
+        desc: what,
+        cat: cat || "Other",
         date: date || today,
         ...(split ? { split } : {}),
       },

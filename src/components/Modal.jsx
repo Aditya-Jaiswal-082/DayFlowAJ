@@ -74,6 +74,7 @@ export function Modal({ open, onClose, title, children, footer }) {
         style={{
           display: "flex",
           flexDirection: "column",
+          minWidth: 0,
           width: "100%",
           maxWidth: mobile ? "none" : 440,
           maxHeight: mobile ? "94%" : "85%",
@@ -125,6 +126,8 @@ export function Modal({ open, onClose, title, children, footer }) {
           style={{
             flex: "1 1 auto",
             minHeight: 0,
+            minWidth: 0,
+            overflowX: "hidden",
             overflowY: "auto",
             overscrollBehavior: "contain",
             padding: "0 1.1rem 0.6rem",
