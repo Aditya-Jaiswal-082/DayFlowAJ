@@ -83,7 +83,7 @@ export function buildTrend(dayData, keys, regularTasks) {
 }
 
 export function buildMood(dayData, keys) {
-  return keys.map((k) => ({ key: k, label: shortLabel(k), score: MOOD_SCORE[dayOf(dayData, k).mood] || 0 }));
+  return keys.map((k) => ({ key: k, label: shortLabel(k), score: MOOD_SCORE[dayOf(dayData, k).mood] || null }));
 }
 
 /** Per-category completion for one day. */

@@ -3,13 +3,12 @@ import { useTracker } from "../context/TrackerContext.jsx";
 import { haptic } from "../lib/haptics.js";
 
 /**
- * Phone navigation: a floating glass dock.
+ * Phone navigation: a flat bar along the bottom edge.
  *
- * The first five tabs get an icon each; the one you're on grows into a pill
- * with its name beside the icon, so the bar stays calm but you always know
- * where you are. Everything past that is behind a ☰ Menu button that opens a
- * sheet, so any section is one tap away — no cycling. (When you're on one of
- * those sections the button shows that section instead of "Menu".)
+ * The first five tabs get an icon and a label each; the current one is marked
+ * with the accent colour and a bar on top. Everything past that is behind a
+ * Menu button that opens a sheet, so any section is one tap away — no cycling.
+ * (On one of those sections the button shows that section's name.)
  *
  * Sits above the home indicator via env(safe-area-inset-bottom).
  */
@@ -82,7 +81,7 @@ export function BottomNav({ tabs, primary = 5 }) {
             onClick={() => setOpen(false)}
             aria-hidden="true"
             className="fade"
-            style={{ position: "fixed", inset: 0, zIndex: 898, background: "rgba(8,12,23,0.38)", backdropFilter: "blur(2px)" }}
+            style={{ position: "fixed", inset: 0, zIndex: 898, background: "rgba(8,12,23,0.4)" }}
           />
           <div
             role="menu"
@@ -92,16 +91,16 @@ export function BottomNav({ tabs, primary = 5 }) {
               position: "fixed",
               left: 12,
               right: 12,
-              bottom: "calc(86px + env(safe-area-inset-bottom))",
+              bottom: "calc(66px + env(safe-area-inset-bottom))",
               zIndex: 899,
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
-              gap: 8,
-              padding: 10,
-              borderRadius: 22,
+              gap: 6,
+              padding: 8,
+              borderRadius: 12,
               background: "var(--card)",
               border: "1px solid var(--border)",
-              boxShadow: "0 16px 44px rgba(8,12,23,0.30)",
+              boxShadow: "var(--shadow-3)",
             }}
           >
             {rest.map((t) => {
@@ -119,9 +118,9 @@ export function BottomNav({ tabs, primary = 5 }) {
                     justifyItems: "center",
                     gap: 6,
                     padding: "0.85rem 0.4rem 0.7rem",
-                    borderRadius: 16,
+                    borderRadius: 8,
                     border: `1px solid ${on ? "var(--accent)" : "var(--border)"}`,
-                    background: on ? "var(--accent-soft)" : "var(--bg-2)",
+                    background: on ? "var(--accent-soft)" : "transparent",
                     color: on ? "var(--accent)" : "var(--text)",
                     fontSize: 12.5,
                     fontWeight: 700,
@@ -141,20 +140,16 @@ export function BottomNav({ tabs, primary = 5 }) {
         aria-label="Main"
         style={{
           position: "fixed",
-          left: 12,
-          right: 12,
-          bottom: "calc(10px + env(safe-area-inset-bottom))",
+          left: 0,
+          right: 0,
+          bottom: 0,
           zIndex: 900,
           display: "flex",
-          alignItems: "center",
-          gap: 4,
-          padding: 6,
-          borderRadius: 26,
+          padding: "0 4px env(safe-area-inset-bottom)",
           background: "var(--glass)",
-          backdropFilter: "blur(18px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(18px) saturate(1.4)",
-          border: "1px solid var(--border)",
-          boxShadow: "0 10px 30px rgba(8,12,23,0.20), 0 2px 6px rgba(8,12,23,0.08)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderTop: "1px solid var(--border)",
         }}
       >
         {shown.map((t) => (
@@ -184,39 +179,30 @@ function NavItem({ id, icon, label, on, onClick, expanded }) {
       aria-current={on && expanded === undefined ? "page" : undefined}
       aria-expanded={expanded}
       aria-haspopup={expanded === undefined ? undefined : "menu"}
-      className="pressable"
       style={{
-        flex: on ? "2.1 1 0" : "1 1 0",
+        position: "relative",
+        flex: "1 1 0",
         minWidth: 0,
-        height: 46,
+        height: 58,
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 6,
-        padding: "0 6px",
-        borderRadius: 20,
-        border: "1px solid transparent",
-        background: on ? "var(--accent-soft)" : "transparent",
-        borderColor: on ? "var(--border)" : "transparent",
+        gap: 3,
+        padding: 0,
+        border: "none",
+        background: "none",
         color: on ? "var(--accent)" : "var(--muted)",
         cursor: "pointer",
-        overflow: "hidden",
-        transition: "flex 280ms cubic-bezier(.22,.61,.36,1), background 200ms ease, color 200ms ease",
+        touchAction: "manipulation",
       }}
     >
-      <Icon id={id} fallback={icon} />
       <span
-        style={{
-          maxWidth: on ? 70 : 0,
-          opacity: on ? 1 : 0,
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          fontSize: 12,
-          fontWeight: 800,
-          letterSpacing: -0.1,
-          transition: "max-width 280ms cubic-bezier(.22,.61,.36,1), opacity 200ms ease",
-        }}
-      >
+        aria-hidden="true"
+        style={{ position: "absolute", top: 0, left: "28%", right: "28%", height: 2, background: on ? "var(--accent)" : "transparent" }}
+      />
+      <Icon id={id} fallback={icon} size={22} />
+      <span style={{ fontSize: 11, fontWeight: on ? 700 : 500, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {label}
       </span>
     </button>

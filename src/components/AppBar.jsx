@@ -16,7 +16,7 @@ import { WhenPicker, whenToTimestamp, whenValue } from "./WhenPicker.jsx";
  */
 export function AppBar() {
   const {
-    selectedDay, today, isToday, isFuture, setSelectedDay, dark, toggleDark, weather, weatherCtl, reminders,
+    tab, selectedDay, today, isToday, setSelectedDay, dark, toggleDark, weather, weatherCtl, reminders,
     notifications, stats, setTab,
   } = useTracker();
 
@@ -54,11 +54,11 @@ export function AppBar() {
               <Chip tone="var(--text)" onClick={() => setTab("settings")}>
                 {weather
                   ? <>{WEATHER_ICONS[weather.desc] || WEATHER_ICONS.default} {weather.temp}°C</>
-                  : weatherCtl.status === "error" ? "☁ weather unavailable" : "☁ weather…"}
+                  : weatherCtl.status === "error" ? "Weather unavailable" : "Weather…"}
               </Chip>
             )}
             {weatherCtl.nudge && !weatherCtl.error && (
-              <Chip onClick={weatherCtl.enable}>☁ Enable weather</Chip>
+              <Chip onClick={weatherCtl.enable}>Enable weather</Chip>
             )}
             <Btn size="icon" variant="ghost" onClick={() => setOpen(true)} title="New reminder">＋</Btn>
             <Btn size="icon" variant="ghost" onClick={toggleDark} title={dark ? "Light mode" : "Dark mode"}>
@@ -67,54 +67,54 @@ export function AppBar() {
           </div>
         </div>
 
-        <div
-          className="no-scrollbar"
-          style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto", paddingBottom: 2 }}
-        >
-          <Chip>{isToday ? "Today" : formatDate(selectedDay).split(",")[0]} · {formatDate(selectedDay).slice(5)}</Chip>
-          {stats.streak > 0 && <Chip tone="#f59e0b">🔥 {stats.streak}-day streak</Chip>}
-          {reminders.next && (
-            <Chip tone="#f59e0b" onClick={() => setTab("reminders")}>
-              🔔 {reminders.next.text} · {formatWhen(reminders.next.at)}
-            </Chip>
-          )}
-          {/* Being on another day is easy to forget — this is both the reminder
-              and the way back. A future day is planned, not edited. */}
-          {!isToday && (
-            <Chip tone={isFuture ? "#6366f1" : "#f59e0b"} onClick={() => setSelectedDay(today)}>
-              {isFuture ? "planning a future day" : "editing a past day"} · back to today
-            </Chip>
-          )}
-        </div>
-
-        {(weatherCtl.askable || weatherCtl.error) && (
+        {((tab !== "today" && !isToday) || (tab !== "today" && stats.streak > 0) || reminders.next) && (
           <div
-            className="fade"
-            style={{
-              marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
-              padding: "0.5rem 0.65rem", borderRadius: 14, background: "var(--card)",
-              border: `1px solid ${weatherCtl.error ? "#ef444466" : "var(--border)"}`, boxShadow: "var(--shadow-1)",
-            }}
+            className="no-scrollbar"
+            style={{ display: "flex", gap: 6, marginTop: 8, overflowX: "auto", paddingBottom: 2 }}
           >
-            {weatherCtl.error ? (
-              <>
-                <span style={{ flex: "1 1 200px", fontSize: 12, lineHeight: 1.35, color: "#ef4444" }}>{weatherCtl.error}</span>
-                <Btn size="sm" variant="ghost" onClick={weatherCtl.dismissError}>Dismiss</Btn>
-                <Btn size="sm" onClick={weatherCtl.enable}>Try again</Btn>
-              </>
-            ) : (
-              <>
-                <span style={{ flex: "1 1 180px", fontSize: 12, lineHeight: 1.35, color: "var(--muted)" }}>
-                  <strong style={{ color: "var(--text)" }}>☀ Show the weather up here?</strong>{" "}
-                  Needs your location, only for this. Nothing else uses it.
-                </span>
-                <Btn size="sm" variant="ghost" onClick={weatherCtl.disable}>No thanks</Btn>
-                <Btn size="sm" onClick={weatherCtl.enable}>Allow</Btn>
-              </>
+            {tab !== "today" && !isToday && (
+              <Chip onClick={() => setSelectedDay(today)}>{formatDate(selectedDay)}, back to today</Chip>
+            )}
+            {tab !== "today" && stats.streak > 0 && <Chip tone="var(--accent)">Streak: {stats.streak} {stats.streak === 1 ? "day" : "days"}</Chip>}
+            {reminders.next && (
+              <Chip onClick={() => setTab("reminders")}>
+                Next reminder: {reminders.next.text}, {formatWhen(reminders.next.at)}
+              </Chip>
             )}
           </div>
         )}
+
       </header>
+
+      {tab !== "settings" && (weatherCtl.askable || weatherCtl.error) && (
+        <div
+          className="fade"
+          style={{
+            margin: "0 0 0.8rem", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            padding: "0.5rem 0.65rem", borderRadius: 8, background: "var(--card)",
+            border: `1px solid ${weatherCtl.error ? "#ef444466" : "var(--border)"}`, boxShadow: "var(--shadow-1)",
+          }}
+        >
+          {weatherCtl.error ? (
+            <>
+              <span style={{ flex: "1 1 200px", fontSize: 12, lineHeight: 1.35, color: "#ef4444" }}>{weatherCtl.error}</span>
+              <Btn size="sm" variant="ghost" onClick={weatherCtl.dismissError}>Dismiss</Btn>
+              <Btn size="sm" onClick={weatherCtl.enable}>Try again</Btn>
+            </>
+          ) : (
+            <>
+              <span style={{ flexBasis: "100%", fontSize: 13, lineHeight: 1.4, color: "var(--muted)" }}>
+                <strong style={{ color: "var(--text)" }}>Show the weather up here?</strong>{" "}
+                It needs your location, only for this. Nothing else uses it.
+              </span>
+              <span style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                <Btn size="sm" variant="ghost" onClick={weatherCtl.disable}>No thanks</Btn>
+                <Btn size="sm" onClick={weatherCtl.enable}>Allow</Btn>
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       <Modal
         open={open}
@@ -148,11 +148,10 @@ function Chip({ children, tone, onClick }) {
     fontSize: 11.5,
     fontWeight: 600,
     padding: "0.3rem 0.6rem",
-    borderRadius: 999,
+    borderRadius: 6,
     color: tone || "var(--muted)",
     background: "var(--card)",
     border: "1px solid var(--border)",
-    boxShadow: "var(--shadow-1)",
   };
 
   if (!onClick) return <span style={style}>{children}</span>;

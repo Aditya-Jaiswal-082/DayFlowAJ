@@ -50,24 +50,12 @@ textarea {
   outline-offset: 2px;
 }
 
-/* Raised surface: ambient shadow + a hairline of light along the top edge.
-   That top highlight is what makes a card read as having thickness. */
+/* A surface: a hairline border on a flat fill. No shadow, no gradient. */
 .tile {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: var(--shadow-1);
+  border-radius: 12px;
   position: relative;
-}
-
-.tile::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  border-radius: 18px 18px 0 0;
-  background: var(--card-hi);
-  pointer-events: none;
 }
 
 .lift {
@@ -76,8 +64,7 @@ textarea {
 
 @media (hover: hover) {
   .lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-2);
+    border-color: var(--muted);
   }
 }
 
@@ -88,8 +75,8 @@ textarea {
 }
 
 .pressable:active {
-  transform: scale(0.965);
-  box-shadow: var(--shadow-press);
+  transform: scale(0.98);
+  opacity: 0.85;
 }
 
 .pop {
@@ -104,15 +91,10 @@ textarea {
   animation: slideUp 280ms cubic-bezier(.22,.61,.36,1) both;
 }
 
-.stagger > * {
-  animation: rise 320ms cubic-bezier(.22,.61,.36,1) both;
+/* Numbers line up in columns. */
+body {
+  font-variant-numeric: tabular-nums;
 }
-
-.stagger > *:nth-child(2) { animation-delay: 40ms; }
-.stagger > *:nth-child(3) { animation-delay: 80ms; }
-.stagger > *:nth-child(4) { animation-delay: 120ms; }
-.stagger > *:nth-child(5) { animation-delay: 160ms; }
-.stagger > *:nth-child(n+6) { animation-delay: 200ms; }
 
 @keyframes pop {
   from { transform: scale(0.9); opacity: 0; }

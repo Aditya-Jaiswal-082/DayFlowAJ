@@ -80,7 +80,7 @@ export function Modal({ open, onClose, title, children, footer }) {
           maxHeight: mobile ? "94%" : "85%",
           background: "var(--card)",
           border: "1px solid var(--border)",
-          borderRadius: mobile ? "22px 22px 0 0" : 20,
+          borderRadius: mobile ? "14px 14px 0 0" : 12,
           boxShadow: "var(--shadow-3)",
           paddingBottom: mobile ? "env(safe-area-inset-bottom)" : 0,
         }}
@@ -110,9 +110,9 @@ export function Modal({ open, onClose, title, children, footer }) {
             style={{
               background: "var(--bg-2)",
               border: "1px solid var(--border)",
-              borderRadius: 10,
-              width: 32,
-              height: 32,
+              borderRadius: 8,
+              width: 36,
+              height: 36,
               cursor: "pointer",
               color: "var(--muted)",
               fontSize: 15,
@@ -148,7 +148,7 @@ export function Modal({ open, onClose, title, children, footer }) {
               padding: "0.8rem 1.1rem",
               borderTop: "1px solid var(--border)",
               background: "var(--card)",
-              borderRadius: mobile ? 0 : "0 0 20px 20px",
+              borderRadius: mobile ? 0 : "0 0 12px 12px",
             }}
           >
             {footer}

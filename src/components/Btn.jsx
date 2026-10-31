@@ -1,24 +1,22 @@
 import { haptic } from "../lib/haptics.js";
 
 const SIZES = {
-  sm: { padding: "0.4rem 0.65rem", fontSize: 12, borderRadius: 10 },
-  md: { padding: "0.6rem 0.95rem", fontSize: 13.5, borderRadius: 12 },
-  lg: { padding: "0.8rem 1.1rem", fontSize: 15, borderRadius: 14 },
-  icon: { padding: "0.5rem", fontSize: 15, borderRadius: 12, lineHeight: 1 },
+  sm: { padding: "0.35rem 0.7rem", fontSize: 13, borderRadius: 8 },
+  md: { padding: "0.6rem 1rem", fontSize: 14, borderRadius: 8 },
+  lg: { padding: "0.8rem 1.2rem", fontSize: 15, borderRadius: 10 },
+  icon: { padding: "0.45rem", fontSize: 15, borderRadius: 8, lineHeight: 1, minWidth: 40 },
 };
 
 const VARIANTS = {
   primary: {
-    background: "linear-gradient(180deg, var(--accent-2), var(--accent))",
+    background: "var(--accent)",
     color: "#fff",
-    border: "1px solid transparent",
-    boxShadow: "var(--shadow-1)",
+    border: "1px solid var(--accent)",
   },
   ghost: {
-    background: "var(--card)",
+    background: "transparent",
     color: "var(--text)",
     border: "1px solid var(--border)",
-    boxShadow: "var(--shadow-1)",
   },
   quiet: {
     background: "transparent",
@@ -27,7 +25,7 @@ const VARIANTS = {
   },
   danger: {
     background: "transparent",
-    color: "#ef4444",
+    color: "#c0392b",
     border: "1px solid transparent",
   },
 };
@@ -55,7 +53,7 @@ export function Btn({
         gap: 6,
         fontWeight: 600,
         width: full ? "100%" : undefined,
-        minHeight: size === "sm" ? 32 : 40,          // comfortable touch target
+        minHeight: size === "sm" ? 36 : 42,          // comfortable touch target
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         ...SIZES[size],

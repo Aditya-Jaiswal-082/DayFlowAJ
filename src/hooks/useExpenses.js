@@ -44,6 +44,28 @@ export function useExpenses({ today, undoable }) {
     });
   }, [expenses, setExpenses, undoable]);
 
+  /**
+   * Fix a logged expense. A split bill keeps its amount (the shares are worked
+   * out from it), so for those only the words and the date can change.
+   */
+  const update = useCallback((id, { amount, desc, cat, date }) => {
+    const before = expenses.find((e) => e.id === id);
+    if (!before) return false;
+    const what = String(desc ?? before.desc).trim();
+    if (!what) return false;
+    let value = before.amount;
+    if (!before.split && amount !== undefined) {
+      value = parseFloat(amount);
+      if (!Number.isFinite(value) || value <= 0) return false;
+    }
+    const next = { ...before, amount: value, desc: what, cat: cat || before.cat || "Other", date: date || before.date };
+    setExpenses((prev) => prev.map((e) => (e.id === id ? next : e)));
+    undoable(`Updated "${what}"`, () => {
+      setExpenses((prev) => prev.map((e) => (e.id === id ? before : e)));
+    });
+    return true;
+  }, [expenses, setExpenses, undoable]);
+
   /** Drops the split from an expense but keeps the expense itself. */
   const unshare = useCallback((id) => {
     const expense = expenses.find((e) => e.id === id);
@@ -71,9 +93,10 @@ export function useExpenses({ today, undoable }) {
     budgets,
     add,
     remove,
+    update,
     unshare,
     setBudget,
     replaceAll: setExpenses,
     replaceBudgets: setBudgets,
-  }), [expenses, budgets, add, remove, unshare, setBudget, setExpenses, setBudgets]);
+  }), [expenses, budgets, add, remove, update, unshare, setBudget, setExpenses, setBudgets]);
 }

@@ -36,7 +36,7 @@ function Shell() {
         background: "var(--bg)",
         color: "var(--text)",
         fontFamily: APP_FONT,
-        paddingBottom: isMobile ? "calc(86px + env(safe-area-inset-bottom))" : "1.5rem",
+        paddingBottom: isMobile ? "calc(78px + env(safe-area-inset-bottom))" : "1.5rem",
       }}
     >
       <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 0.9rem" }} {...(isMobile ? swipe : {})}>

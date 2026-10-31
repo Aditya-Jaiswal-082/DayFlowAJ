@@ -22,9 +22,6 @@ export const REPEAT_OPTIONS = [
 export const repeatLabel = (days) => (REPEAT_OPTIONS.find((o) => o.value === days) || REPEAT_OPTIONS[0]).label;
 export const repeatValue = (label) => (REPEAT_OPTIONS.find((o) => o.label === label) || REPEAT_OPTIONS[0]).value;
 
-/** Tint for a timed task, by the part of the day it starts in. */
-export const periodColor = (m) => (m < 300 ? "#6366f1" : m < 720 ? "#f59e0b" : m < 1020 ? "#06b6d4" : m < 1260 ? "#a855f7" : "#6366f1");
-
 /* ── clock helpers ─────────────────────────────────────────────────────── */
 
 /** "06:30" (an <input type="time"> value) → 390, or null if unreadable. */

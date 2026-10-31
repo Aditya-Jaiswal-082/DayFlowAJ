@@ -1,104 +1,137 @@
 import { haptic } from "../lib/haptics.js";
-import { Btn } from "./Btn.jsx";
 
 /**
- * One checkable task line.
+ * One line in a checklist — flat, with a divider above it (the list draws the
+ * outer frame). The whole text area is a button when `onOpen` is given, so a
+ * tap anywhere on the title opens the task; the checkbox is its own, larger
+ * touch target.
  *
- * The label is its own button when `onInspect` is given, so tapping the text
- * opens that task's insight while the checkbox stays a checkbox. `color` must
- * be a hex value — the category tag derives its tint from it.
- *
- * Optional extras for timed tasks: `time` (a "7:00 AM – 9:00 AM" line), `status`
- * ({ label, color }), `accent` (left-edge colour), `highlight` (tint the row —
- * "happening now") and `onEdit` (shows a ✎ button).
+ *   text      the task
+ *   meta      small muted facts under it: [{ text, color? }] — "7:00 – 9:00 AM", a category…
+ *   status    { label, color } shown on the right ("Now", "Missed")
+ *   flag      { label, color } a priority marker on the right
+ *   highlight tint the row (the task happening now)
+ *   onRemove  shows a small ✕ (for the simple lists that have no editor)
  */
 export function TaskRow({
-  text, cat, done, onToggle, onRemove, onInspect, removeTitle = "Remove",
-  color = "#6366f1", badge, hint,
-  time, status, accent, highlight, onEdit, disabled,
+  text, meta = [], done, disabled, onToggle, onOpen, onRemove, removeTitle = "Remove",
+  status, flag, highlight, first,
 }) {
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 7,
-        padding: "0.65rem 0.7rem",
-        borderRadius: 14,
-        background: highlight ? "var(--accent-soft)" : done ? "var(--bg-2)" : "var(--card)",
-        border: "1px solid var(--border)",
-        ...(accent ? { borderLeft: `3px solid ${accent}` } : {}),
-        boxShadow: done ? "var(--shadow-press)" : "var(--shadow-1)",
-        transition: "background 200ms ease, box-shadow 200ms ease",
+        alignItems: "stretch",
+        minHeight: 56,
+        borderTop: first ? "none" : "1px solid var(--border)",
+        background: highlight ? "var(--accent-soft)" : "transparent",
+        boxShadow: highlight ? "inset 3px 0 0 var(--accent)" : "none",
       }}
     >
-      <input
-        type="checkbox"
-        checked={!!done}
-        disabled={disabled}
-        title={disabled ? "Opens on the day" : undefined}
-        onChange={() => { haptic(done ? "tap" : "toggle"); onToggle(); }}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={!!done}
         aria-label={text}
-        style={{ width: 21, height: 21, accentColor: color, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, flexShrink: 0 }}
-      />
+        disabled={disabled}
+        title={disabled ? "You can tick this on the day" : undefined}
+        onClick={() => { haptic(done ? "tap" : "toggle"); onToggle(); }}
+        style={{
+          flexShrink: 0,
+          width: 52,
+          display: "grid",
+          placeItems: "center",
+          background: "none",
+          border: "none",
+          padding: 0,
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.4 : 1,
+        }}
+      >
+        <span
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            display: "grid",
+            placeItems: "center",
+            border: `1.5px solid ${done ? "var(--accent)" : "var(--muted)"}`,
+            background: done ? "var(--accent)" : "transparent",
+            transition: "background 120ms ease, border-color 120ms ease",
+          }}
+        >
+          {done && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          )}
+        </span>
+      </button>
 
       <button
         type="button"
-        onClick={onInspect}
-        disabled={!onInspect}
-        title={onInspect ? "See this task's pattern" : undefined}
+        onClick={onOpen}
+        disabled={!onOpen}
         style={{
           flex: 1,
           minWidth: 0,
           textAlign: "left",
           background: "none",
           border: "none",
-          padding: 0,
-          cursor: onInspect ? "pointer" : "default",
+          padding: "0.6rem 0.5rem 0.6rem 0",
+          cursor: onOpen ? "pointer" : "default",
           color: "inherit",
+          display: "grid",
+          alignContent: "center",
+          gap: 2,
         }}
       >
         <span
           style={{
-            fontSize: 14.5,
+            fontSize: 15.5,
+            lineHeight: 1.3,
+            fontWeight: 500,
             wordBreak: "break-word",
             color: done ? "var(--muted)" : "var(--text)",
-            textDecoration: done ? "line-through" : "none",
+            textDecorationLine: done ? "line-through" : "none",
+            textDecorationColor: "var(--muted)",
           }}
         >
           {text}
         </span>
-        {time && <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{time}</div>}
-        {hint && <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 2 }}>{hint}</div>}
+        {meta.length > 0 && (
+          <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 12, rowGap: 0, fontSize: 12.5, color: "var(--muted)" }}>
+            {meta.map((m, i) => (
+              <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 5, color: m.color || "var(--muted)" }}>
+                {m.dot && <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 2, background: m.dot }} />}
+                {m.text}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
 
-      {status && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 800, color: status.color }}>{status.label}</span>}
-      {badge && <Tag color={badge.color}>{badge.label}</Tag>}
-      {cat && <Tag color={color}>{cat}</Tag>}
-      {onEdit && <Btn variant="ghost" size="sm" onClick={onEdit} title="Edit">✎</Btn>}
-      {onRemove && <Btn variant="danger" size="sm" onClick={onRemove} title={removeTitle} feedback="warn">✕</Btn>}
-    </div>
-  );
-}
+      {(status || flag) && (
+        <div style={{ display: "grid", alignContent: "center", justifyItems: "end", gap: 2, paddingRight: 12, flexShrink: 0 }}>
+          {status && <span style={{ fontSize: 12.5, fontWeight: 700, color: status.color }}>{status.label}</span>}
+          {flag && <span style={{ fontSize: 12, fontWeight: 600, color: flag.color }}>{flag.label}</span>}
+        </div>
+      )}
 
-function Tag({ children, color }) {
-  return (
-    <span
-      style={{
-        flexShrink: 0,
-        whiteSpace: "nowrap",
-        fontSize: 10,
-        fontWeight: 800,
-        letterSpacing: 0.2,
-        padding: "0.22rem 0.45rem",
-        borderRadius: 7,
-        color,
-        background: `${color}1f`,
-        border: `1px solid ${color}33`,
-      }}
-    >
-      {children}
-    </span>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={() => { haptic("warn"); onRemove(); }}
+          title={removeTitle}
+          aria-label={removeTitle}
+          style={{
+            flexShrink: 0, width: 44, background: "none", border: "none", cursor: "pointer",
+            color: "var(--muted)", fontSize: 16,
+          }}
+        >
+          ✕
+        </button>
+      )}
+    </div>
   );
 }

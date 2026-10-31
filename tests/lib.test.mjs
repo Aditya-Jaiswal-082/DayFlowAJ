@@ -142,7 +142,7 @@ check("pct ignores tasks not yet created", completionPct(data, "2026-08-09", [
 check("countsFor totals", countsFor(dayOf(data, "2026-08-10"), tasks).total === 4);
 check("trend length matches keys", buildTrend(data, getPastDays(7), tasks).length === 7);
 check("mood scores map through", buildMood(data, ["2026-08-10"])[0].score === MOOD_SCORE.good);
-check("mood defaults to 0 when unlogged", buildMood({}, ["2026-08-01"])[0].score === 0);
+check("mood is null when unlogged, so charts show a gap", buildMood({}, ["2026-08-01"])[0].score === null);
 check("radar one row per category", buildRadar(dayOf(data, "2026-08-10"), tasks).length === 2);
 check("radar pct per category", buildRadar(dayOf(data, "2026-08-10"), tasks).find((r) => r.cat === "Health").pct === 100);
 check("streak is 0 with no active tasks", currentStreak(data, []) === 0);

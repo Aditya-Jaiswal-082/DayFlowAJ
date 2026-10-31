@@ -19,7 +19,7 @@ export const EXPENSE_CATS = [
 
 export const PRIORITIES = [
   { val: "high", label: "High", color: "#ef4444" },
-  { val: "normal", label: "Normal", color: "#6366f1" },
+  { val: "normal", label: "Normal", color: "#1d7a4f" },
   { val: "low", label: "Low", color: "#94a3b8" },
 ];
 
@@ -28,7 +28,7 @@ export const PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
 
 export const MOOD_OPTS = [
   { val: "great", label: "Great", emoji: "😄", color: "#10b981" },
-  { val: "good", label: "Good", emoji: "🙂", color: "#6366f1" },
+  { val: "good", label: "Good", emoji: "🙂", color: "#2c9163" },
   { val: "okay", label: "Okay", emoji: "😐", color: "#f59e0b" },
   { val: "low", label: "Low", emoji: "😔", color: "#f97316" },
   { val: "bad", label: "Bad", emoji: "😞", color: "#ef4444" },

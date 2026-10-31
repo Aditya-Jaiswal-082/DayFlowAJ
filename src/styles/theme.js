@@ -2,45 +2,44 @@
  * Theme tokens are CSS custom properties set on the app root, so components can
  * use var(--card) without importing anything. Charts need real values → chartTheme().
  *
- * The depth model: every raised surface gets a soft ambient shadow plus a 1px
- * top highlight (--card-hi). That pairing is what reads as physical thickness —
- * not a heavy drop shadow.
+ * Flat by design: surfaces are separated by a 1px border, not by shadows or
+ * gradients. Accent green comes from the logo.
  */
 
 const LIGHT = {
-  "--bg": "#f4f6fb",
-  "--bg-2": "#eceff7",
+  "--bg": "#f3f5f4",
+  "--bg-2": "#e8ecea",
   "--card": "#ffffff",
-  "--card-hi": "rgba(255,255,255,0.9)",
-  "--text": "#101829",
-  "--muted": "#647084",
-  "--border": "#e3e8f2",
-  "--accent": "#5b5bf0",
-  "--accent-2": "#8b87f5",
-  "--accent-soft": "rgba(91,91,240,0.10)",
-  "--shadow-1": "0 1px 2px rgba(16,24,41,0.05), 0 2px 8px rgba(16,24,41,0.05)",
-  "--shadow-2": "0 2px 4px rgba(16,24,41,0.06), 0 10px 24px rgba(16,24,41,0.08)",
-  "--shadow-3": "0 8px 16px rgba(16,24,41,0.10), 0 24px 56px rgba(16,24,41,0.16)",
-  "--shadow-press": "inset 0 2px 6px rgba(16,24,41,0.12)",
-  "--glass": "rgba(244,246,251,0.82)",
+  "--card-hi": "rgba(255,255,255,0)",
+  "--text": "#141918",
+  "--muted": "#5c6663",
+  "--border": "#dce2df",
+  "--accent": "#1d7a4f",
+  "--accent-2": "#2c9163",
+  "--accent-soft": "rgba(29,122,79,0.10)",
+  "--shadow-1": "none",
+  "--shadow-2": "0 4px 14px rgba(20,25,24,0.08)",
+  "--shadow-3": "0 10px 36px rgba(20,25,24,0.22)",
+  "--shadow-press": "none",
+  "--glass": "rgba(243,245,244,0.94)",
 };
 
 const DARK = {
-  "--bg": "#080c17",
-  "--bg-2": "#0f1524",
-  "--card": "#141b2d",
-  "--card-hi": "rgba(255,255,255,0.06)",
-  "--text": "#eef2fa",
-  "--muted": "#93a0b8",
-  "--border": "#233049",
-  "--accent": "#7c7cf7",
-  "--accent-2": "#a5a1fb",
-  "--accent-soft": "rgba(124,124,247,0.16)",
-  "--shadow-1": "0 1px 2px rgba(0,0,0,0.4)",
-  "--shadow-2": "0 2px 6px rgba(0,0,0,0.45), 0 12px 28px rgba(0,0,0,0.4)",
-  "--shadow-3": "0 10px 20px rgba(0,0,0,0.5), 0 28px 64px rgba(0,0,0,0.55)",
-  "--shadow-press": "inset 0 2px 8px rgba(0,0,0,0.5)",
-  "--glass": "rgba(8,12,23,0.82)",
+  "--bg": "#0d1110",
+  "--bg-2": "#161c1a",
+  "--card": "#1a211f",
+  "--card-hi": "rgba(255,255,255,0)",
+  "--text": "#e8eeeb",
+  "--muted": "#97a39f",
+  "--border": "#2a3431",
+  "--accent": "#4cc38a",
+  "--accent-2": "#6ad3a0",
+  "--accent-soft": "rgba(76,195,138,0.14)",
+  "--shadow-1": "none",
+  "--shadow-2": "0 4px 14px rgba(0,0,0,0.4)",
+  "--shadow-3": "0 12px 40px rgba(0,0,0,0.55)",
+  "--shadow-press": "none",
+  "--glass": "rgba(13,17,16,0.94)",
 };
 
 export const getTheme = (dark) => (dark ? DARK : LIGHT);
@@ -56,7 +55,7 @@ export function chartTheme(theme) {
     tip: {
       background: theme["--card"],
       border: `1px solid ${theme["--border"]}`,
-      borderRadius: 12,
+      borderRadius: 8,
       color: theme["--text"],
       fontSize: 12,
       boxShadow: theme["--shadow-2"],
@@ -67,14 +66,13 @@ export function chartTheme(theme) {
 export const inputStyle = {
   width: "100%",
   padding: "0.7rem 0.8rem",
-  borderRadius: 12,
+  borderRadius: 8,
   border: "1px solid var(--border)",
-  background: "var(--bg-2)",
+  background: "var(--card)",
   color: "var(--text)",
   fontSize: 15,          // 16px-ish stops iOS zooming the page on focus
   outline: "none",
   boxSizing: "border-box",
-  boxShadow: "var(--shadow-press)",
 };
 
 export const labelStyle = {

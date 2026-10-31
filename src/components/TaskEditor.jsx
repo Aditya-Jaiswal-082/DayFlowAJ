@@ -12,6 +12,7 @@ import { Segmented } from "./Segmented.jsx";
 import { WhenPicker, whenToTimestamp, whenValue } from "./WhenPicker.jsx";
 
 const REPEAT_LABELS = REPEAT_OPTIONS.map((o) => o.label);
+const DEFAULT_CAT = TASK_CATS.includes("Personal") ? "Personal" : TASK_CATS[0];
 
 /**
  * Add or edit a regular task — one modal for both.
@@ -25,12 +26,12 @@ const REPEAT_LABELS = REPEAT_OPTIONS.map((o) => o.label);
  * starts fresh every time.
  */
 export function TaskEditor({ task, nowMin, onClose }) {
-  const { tasks, addTaskWithReminder, notifications, isFuture, selectedDay } = useTracker();
+  const { tasks, addTaskWithReminder, notifications, isFuture, selectedDay, openInsight } = useTracker();
   const editing = !!task;
 
   const [mode, setMode] = useState("one");   // "one" | "many"
   const [text, setText] = useState(task?.text || "");
-  const [cat, setCat] = useState(task?.cat || TASK_CATS[0]);
+  const [cat, setCat] = useState(task?.cat || DEFAULT_CAT);
   const [priority, setPriority] = useState(task?.priority || "normal");
   const [timed, setTimed] = useState(task ? isTimed(task) : false);
   const [start, setStart] = useState(task && isTimed(task) ? toHHMM(task.start) : toHHMM(nowMin));
@@ -78,6 +79,16 @@ export function TaskEditor({ task, nowMin, onClose }) {
     onClose();
   }
 
+  function archiveTask() {
+    tasks.archive(task.id);
+    onClose();
+  }
+
+  function seeHistory() {
+    onClose();
+    openInsight({ kind: "task", taskId: task.id });
+  }
+
   const many = !editing && mode === "many";
   const submit = many ? saveMany : saveOne;
   const canSubmit = many ? parsed.items.length > 0 : canSaveOne;
@@ -91,6 +102,13 @@ export function TaskEditor({ task, nowMin, onClose }) {
       title={editing ? "Edit task" : "Add task"}
       footer={
         <>
+          {editing && (
+            <>
+              <Btn variant="danger" onClick={archiveTask}>Archive</Btn>
+              <Btn variant="quiet" onClick={seeHistory}>History</Btn>
+              <span style={{ flex: 1 }} />
+            </>
+          )}
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
           <Btn onClick={submit} disabled={!canSubmit}>{submitLabel}</Btn>
         </>
@@ -171,14 +189,14 @@ export function TaskEditor({ task, nowMin, onClose }) {
                       style={{
                         flex: 1,
                         padding: "0.6rem",
-                        borderRadius: 13,
-                        fontSize: 12.5,
-                        fontWeight: 800,
+                        minHeight: 42,
+                        borderRadius: 8,
+                        fontSize: 13.5,
+                        fontWeight: 600,
                         cursor: "pointer",
                         border: `1px solid ${active ? p.color : "var(--border)"}`,
-                        background: active ? `${p.color}1f` : "var(--bg-2)",
+                        background: active ? `${p.color}1f` : "transparent",
                         color: active ? p.color : "var(--muted)",
-                        boxShadow: active ? "var(--shadow-1)" : "var(--shadow-press)",
                       }}
                     >
                       {p.label}

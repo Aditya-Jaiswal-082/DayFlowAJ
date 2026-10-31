@@ -1,137 +1,113 @@
 import { useState } from "react";
 import { useTracker } from "../context/TrackerContext.jsx";
 import { addDays, formatDate } from "../lib/dates.js";
+import { haptic } from "../lib/haptics.js";
 import { Btn } from "./Btn.jsx";
 import { Calendar } from "./Calendar.jsx";
-import { Card } from "./Card.jsx";
 import { Modal } from "./Modal.jsx";
 
+const Chevron = ({ dir }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+
+const navButton = {
+  width: 44,
+  height: 44,
+  display: "grid",
+  placeItems: "center",
+  borderRadius: 8,
+  border: "1px solid var(--border)",
+  background: "var(--card)",
+  color: "var(--text)",
+  cursor: "pointer",
+  flexShrink: 0,
+};
+
 /**
- * Step a day at a time, or open the calendar to jump straight to any date,
- * to see what got ticked — or missed — on any day. Also where a day gets
- * marked a holiday, which brings in the holiday task list below.
+ * Step a day at a time, or open the calendar to jump to any date — past days
+ * show what was ticked and what slipped, future days are for planning. Also
+ * where a day gets marked as a holiday, which brings in the holiday task list.
  */
 export function DayNav() {
-  const { today, selectedDay, setSelectedDay, isToday, isWeekend, tasks } = useTracker();
+  const { today, selectedDay, setSelectedDay, isToday, isFuture, isWeekend, tasks } = useTracker();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const label = formatDate(selectedDay);
   const commaAt = label.indexOf(",");
   const weekday = commaAt === -1 ? label : label.slice(0, commaAt);
-  const rest = commaAt === -1 ? "" : label.slice(commaAt + 1).trim();
+  const rest = commaAt === -1 ? label : label.slice(commaAt + 1).trim();
+
+  function step(delta) {
+    haptic("tap");
+    setSelectedDay(addDays(selectedDay, delta));
+  }
 
   function jumpTo(key) {
     setSelectedDay(key);
     setPickerOpen(false);
   }
 
-  const badge = tasks.isHoliday
-    ? { text: `🎉 ${tasks.holidayLabel}`, bg: "#f43f8e22", fg: "#f43f8e" }
+  const dayKind = tasks.isHoliday
+    ? { text: tasks.holidayLabel || "Holiday", color: "#b4541a" }
     : isWeekend
-      ? { text: "🌅 Weekend", bg: "var(--bg-2)", fg: "var(--muted)" }
+      ? { text: "Weekend", color: "var(--muted)" }
       : null;
 
   return (
-    <>
-      <Card style={{ padding: "0.55rem 0.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <Btn
-            size="icon"
-            variant="ghost"
-            title="Previous day"
-            onClick={() => setSelectedDay(addDays(selectedDay, -1))}
-          >
-            ‹
-          </Btn>
+    <div style={{ display: "grid", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button type="button" className="pressable" style={navButton} onClick={() => step(-1)} aria-label="Previous day">
+          <Chevron dir="left" />
+        </button>
 
-          <button
-            type="button"
-            className="pressable"
-            onClick={() => setPickerOpen(true)}
-            title="Open the calendar"
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 1,
-              padding: "0.3rem 0.4rem",
-              borderRadius: 12,
-              cursor: "pointer",
-              background: "transparent",
-              border: "none",
-              color: "var(--text)",
-              font: "inherit",
-            }}
-          >
-            <span style={{ fontSize: 14.5, fontWeight: 800 }}>{isToday ? "Today" : weekday}</span>
-            <span style={{ fontSize: 11.5, color: "var(--muted)" }}>{rest || label}</span>
-          </button>
-
-          <Btn
-            size="icon"
-            variant="ghost"
-            title="Open the calendar"
-            onClick={() => setPickerOpen(true)}
-          >
-            📅
-          </Btn>
-
-          <Btn
-            size="icon"
-            variant="ghost"
-            title="Next day"
-            onClick={() => setSelectedDay(addDays(selectedDay, 1))}
-          >
-            ›
-          </Btn>
-        </div>
-
-        <div
+        <button
+          type="button"
+          className="pressable"
+          onClick={() => setPickerOpen(true)}
+          aria-label="Pick a date"
           style={{
-            marginTop: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-            flexWrap: "wrap",
+            flex: 1, minWidth: 0, height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            border: "none", background: "none", color: "var(--text)", cursor: "pointer", padding: 0,
           }}
         >
-          {badge ? (
-            <span
-              style={{
-                fontSize: 11.5,
-                fontWeight: 700,
-                padding: "0.25rem 0.55rem",
-                borderRadius: 999,
-                background: badge.bg,
-                color: badge.fg,
-              }}
-            >
-              {badge.text}
-            </span>
-          ) : <span />}
+          <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.2 }}>{isToday ? "Today" : weekday}</span>
+          <span style={{ fontSize: 14, color: "var(--muted)" }}>{rest}</span>
+        </button>
 
-          <div style={{ display: "flex", gap: 6 }}>
-            {tasks.isHoliday ? (
-              <Btn size="sm" variant="ghost" onClick={() => tasks.clearHoliday(selectedDay)}>
-                Unmark holiday
-              </Btn>
-            ) : (
-              <Btn size="sm" variant="ghost" onClick={() => tasks.setHoliday(selectedDay, "Holiday")}>
-                Mark as holiday
-              </Btn>
-            )}
-            {!isToday && (
-              <Btn size="sm" variant="ghost" onClick={() => setSelectedDay(today)}>Today</Btn>
-            )}
-          </div>
+        <button type="button" className="pressable" style={navButton} onClick={() => setPickerOpen(true)} aria-label="Open calendar">
+          <CalendarIcon />
+        </button>
+        <button type="button" className="pressable" style={navButton} onClick={() => step(1)} aria-label="Next day">
+          <Chevron dir="right" />
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 32 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: dayKind?.color }}>
+          {dayKind?.text || (isFuture ? "Planning ahead" : !isToday ? "Past day" : "")}
+        </span>
+        <div style={{ display: "flex", gap: 4 }}>
+          {!isToday && <Btn size="sm" variant="quiet" onClick={() => setSelectedDay(today)}>Back to today</Btn>}
+          {tasks.isHoliday ? (
+            <Btn size="sm" variant="quiet" onClick={() => tasks.clearHoliday(selectedDay)}>Unmark holiday</Btn>
+          ) : (
+            <Btn size="sm" variant="quiet" onClick={() => tasks.setHoliday(selectedDay, "Holiday")}>Mark as holiday</Btn>
+          )}
         </div>
-      </Card>
+      </div>
 
-      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Jump to a date">
+      <Modal open={pickerOpen} onClose={() => setPickerOpen(false)} title="Go to a date">
         <Calendar value={selectedDay} onSelect={jumpTo} max={addDays(today, 730)} />
       </Modal>
-    </>
+    </div>
   );
 }
